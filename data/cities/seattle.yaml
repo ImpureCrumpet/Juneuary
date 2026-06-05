@@ -1,0 +1,410 @@
+# Seattle's per-city manifestation of microseasons.
+#
+# Reference concepts by their canonical_name in data/microseasons.yaml.
+# Everything time/temp/condition/trigger/climate-driver lives here because it
+# varies by city.
+
+city: seattle
+
+# 30-year climate normals. Every defined microseason is implicitly an anomaly
+# AGAINST these (a few degrees over normal high in February is what makes
+# Fool's Spring a microseason; in San Francisco the same observation isn't).
+# Numbers approximated from NOAA NCEI 1991-2020 normals for KSEA.
+climate_normals:
+  period_start_year: 1991
+  period_end_year: 2020
+  source: "NOAA NCEI 1991-2020 (approximated, KSEA)"
+  monthly:
+    #  mo  hi   lo   mean  precip  rainy_days  snow  sun%
+    1:  { temp_max_avg_f: 47, temp_min_avg_f: 37, temp_mean_f: 42, precip_total_in: 5.6, precip_days: 18, snow_total_in: 1.0, sun_pct: 25 }
+    2:  { temp_max_avg_f: 50, temp_min_avg_f: 37, temp_mean_f: 44, precip_total_in: 3.5, precip_days: 16, snow_total_in: 0.5, sun_pct: 34 }
+    3:  { temp_max_avg_f: 54, temp_min_avg_f: 40, temp_mean_f: 47, precip_total_in: 3.7, precip_days: 17, snow_total_in: 0.0, sun_pct: 42 }
+    4:  { temp_max_avg_f: 59, temp_min_avg_f: 42, temp_mean_f: 51, precip_total_in: 2.7, precip_days: 14, snow_total_in: 0.0, sun_pct: 49 }
+    5:  { temp_max_avg_f: 66, temp_min_avg_f: 48, temp_mean_f: 57, precip_total_in: 1.9, precip_days: 10, snow_total_in: 0.0, sun_pct: 53 }
+    6:  { temp_max_avg_f: 71, temp_min_avg_f: 53, temp_mean_f: 62, precip_total_in: 1.5, precip_days:  9, snow_total_in: 0.0, sun_pct: 49 }
+    7:  { temp_max_avg_f: 77, temp_min_avg_f: 56, temp_mean_f: 67, precip_total_in: 0.7, precip_days:  4, snow_total_in: 0.0, sun_pct: 62 }
+    8:  { temp_max_avg_f: 77, temp_min_avg_f: 57, temp_mean_f: 67, precip_total_in: 1.0, precip_days:  5, snow_total_in: 0.0, sun_pct: 60 }
+    9:  { temp_max_avg_f: 71, temp_min_avg_f: 53, temp_mean_f: 62, precip_total_in: 1.5, precip_days:  8, snow_total_in: 0.0, sun_pct: 53 }
+    10: { temp_max_avg_f: 60, temp_min_avg_f: 46, temp_mean_f: 53, precip_total_in: 3.5, precip_days: 14, snow_total_in: 0.0, sun_pct: 36 }
+    11: { temp_max_avg_f: 51, temp_min_avg_f: 41, temp_mean_f: 46, precip_total_in: 6.6, precip_days: 18, snow_total_in: 0.4, sun_pct: 23 }
+    12: { temp_max_avg_f: 45, temp_min_avg_f: 36, temp_mean_f: 41, precip_total_in: 5.6, precip_days: 18, snow_total_in: 1.2, sun_pct: 21 }
+
+# Which precipitation patterns from data/precipitation.yaml apply here.
+precipitation_patterns:
+  - name: "Pineapple Express"
+  - name: "Fraser Valley Outflow"
+  - name: "Convergence Zone"
+  - name: "Marine Layer Push"
+
+# ---------------------------------------------------------------------------
+# OCCURRENCES
+# ---------------------------------------------------------------------------
+occurrences:
+
+  # ----- Winter series -----
+  - microseason: "Winter"
+    typical_start_month: 12
+    typical_start_day: 1
+    typical_end_month: 2
+    typical_end_day: 28
+    temp_min_f: 28
+    temp_max_f: 48
+    conditions: [overcast, cold_rain, possible_snow, low_sun]
+    climate_drivers: [la_nina, el_nino, arctic_outflow]
+    can_be_amplified: true
+    local_description: >
+      Highs in the 40s, lows near freezing, rain that's more airborne dampness
+      than weather. Sunset at 4:20 PM.
+
+  - microseason: "Second Winter"
+    typical_start_month: 3
+    typical_start_day: 1
+    typical_end_month: 3
+    typical_end_day: 20
+    temp_min_f: 30
+    temp_max_f: 50
+    conditions: [returning_cold, hail_pellets, sleet, sudden_overcast]
+    triggers: >
+      Arctic trough re-asserts after a warm Feb/early-Mar tease, often with
+      surprise snow showers in the foothills.
+    is_nonlinear: true
+    can_be_skipped: true
+
+  - microseason: "Third Winter"
+    typical_start_month: 4
+    typical_start_day: 1
+    typical_end_month: 4
+    typical_end_day: 20
+    temp_min_f: 34
+    temp_max_f: 55
+    conditions: [cold_rain, gusty_wind, isolated_thundershower]
+    is_nonlinear: true
+    can_be_skipped: true
+    local_description: >
+      Frequently includes a dramatic hailstorm during a Mariners home opener.
+
+  # ----- Spring series -----
+  - microseason: "Fool's Spring"
+    typical_start_month: 2
+    typical_start_day: 10
+    typical_end_month: 2
+    typical_end_day: 28
+    temp_min_f: 42
+    temp_max_f: 62
+    conditions: [sunny_breaks, light_breeze, false_warmth]
+    triggers: >
+      First multi-day stretch of 60°F+ after the solstice. Convinces every
+      Seattleite to wear shorts to Cap Hill and buy tomato starts.
+    is_nonlinear: true
+
+  - microseason: "Spring of Deception"
+    typical_start_month: 3
+    typical_start_day: 20
+    typical_end_month: 3
+    typical_end_day: 31
+    temp_min_f: 40
+    temp_max_f: 64
+    conditions: [intermittent_sun, scattered_showers, blossoms]
+    is_nonlinear: true
+
+  - microseason: "The Pollening"
+    typical_start_month: 4
+    typical_end_month: 5
+    conditions: [yellow_dust_on_everything, alder_pollen, grass_pollen, high_pollen_count]
+    notes: >
+      Often overlaps Third Winter and Actual Spring.
+
+  - microseason: "Actual Spring"
+    typical_start_month: 5
+    typical_start_day: 1
+    typical_end_month: 6
+    typical_end_day: 15
+    temp_min_f: 48
+    temp_max_f: 70
+    conditions: [reliable_sun_breaks, mild, blossoms, rhododendrons]
+    local_description: >
+      Lasts about ten days before Juneuary moves in.
+
+  # ----- Summer + heat -----
+  - microseason: "Juneuary"
+    typical_start_month: 6
+    typical_start_day: 1
+    typical_end_month: 7
+    typical_end_day: 4
+    temp_min_f: 50
+    temp_max_f: 65
+    conditions: [marine_layer, drizzle, overcast, cool]
+    climate_drivers: [marine_push]
+    local_description: >
+      Reliably clears around July 5th. The defining microseason that proves
+      we need this taxonomy.
+
+  - microseason: "Summer"
+    typical_start_month: 7
+    typical_start_day: 5
+    typical_end_month: 9
+    typical_end_day: 5
+    temp_min_f: 58
+    temp_max_f: 82
+    conditions: [dry, sun, low_humidity, smoke_possible]
+    local_description: >
+      75°F, no humidity, sunsets at 9 PM. The reason anyone tolerates the
+      other ten months.
+
+  - microseason: "Hell's Front Porch"
+    typical_start_month: 7
+    typical_end_month: 8
+    temp_min_f: 90
+    temp_max_f: 115
+    conditions: [heat_dome, no_AC_in_most_homes, smoke_likely, dry]
+    triggers: >
+      Upper-level ridge parks over the PNW and 850mb temps spike. 3+ days
+      of 95°F+ with overnight lows above 65°F. See: 2021 heat dome.
+    climate_drivers: [heat_dome]
+    is_nonlinear: true
+    can_be_amplified: true
+    local_description: >
+      Pavement-melting, salmon-poaching, hardware-store-fan-shortage heat in
+      a city largely built without air conditioning.
+
+  - microseason: "Oppressive Sun"
+    typical_start_month: 7
+    typical_end_month: 8
+    temp_min_f: 85
+    conditions: [bright, dry, dehydrating, smoke_possible]
+    triggers: >
+      Extended stretch (5+ days) of 85°F+ cloudless days.
+    is_nonlinear: true
+    can_be_amplified: true
+
+  # ----- Fall -----
+  - microseason: "False Fall"
+    typical_start_month: 8
+    typical_start_day: 20
+    typical_end_month: 9
+    typical_end_day: 10
+    temp_min_f: 52
+    temp_max_f: 68
+    conditions: [cool_mornings, light_rain, early_sweater_weather]
+    is_nonlinear: true
+
+  - microseason: "Second Summer"
+    typical_start_month: 9
+    typical_start_day: 10
+    typical_end_month: 10
+    typical_end_day: 5
+    temp_min_f: 55
+    temp_max_f: 80
+    conditions: [warm, dry, golden_light, low_humidity]
+    local_description: >
+      Arguably the best weather of the year. Often co-occurs with Smoketember,
+      ruining it.
+
+  - microseason: "Actual Fall"
+    typical_start_month: 10
+    typical_start_day: 5
+    typical_end_month: 11
+    typical_end_day: 15
+    temp_min_f: 42
+    temp_max_f: 62
+    conditions: [crisp, leaves_turning, cool_rain_returning, morning_fog]
+    local_description: >
+      Lasts about three weeks before The Grey absorbs everything.
+
+  # ----- Wet / dark progression -----
+  - microseason: "The Grey"
+    typical_start_month: 10
+    typical_start_day: 20
+    typical_end_month: 12
+    typical_end_day: 1
+    temp_min_f: 40
+    temp_max_f: 55
+    conditions: [persistent_overcast, low_ceiling, no_precip_just_gray]
+
+  - microseason: "The Long Dark"
+    typical_start_month: 11
+    typical_start_day: 15
+    typical_end_month: 2
+    typical_end_day: 1
+    temp_min_f: 32
+    temp_max_f: 48
+    conditions: [short_days, low_sun_angle, overcast, persistent_rain]
+    local_description: >
+      Sunset at 4:20 PM, sunrise at 8 AM, and a thick lid of cloud the entire
+      time.
+
+  - microseason: "The Dark Wet"
+    typical_start_month: 11
+    typical_end_month: 2
+    temp_min_f: 36
+    temp_max_f: 50
+    conditions: [steady_rain, dark, cold]
+
+  - microseason: "Brightening Wet"
+    typical_start_month: 2
+    typical_end_month: 3
+    temp_min_f: 40
+    temp_max_f: 55
+    conditions: [steady_rain, lengthening_days, occasional_sun_break]
+    local_description: >
+      The sun sets at 6 PM now instead of 4:20.
+
+  - microseason: "Molding Wet"
+    typical_start_month: 3
+    typical_end_month: 4
+    temp_min_f: 42
+    temp_max_f: 58
+    conditions: [warm_rain, high_humidity, mildew_risk]
+
+  - microseason: "Flowering Wet"
+    typical_start_month: 4
+    typical_end_month: 5
+    temp_min_f: 45
+    temp_max_f: 62
+    conditions: [warm_showers, blossoms_everywhere, occasional_sun]
+
+  - microseason: "Welcome Drizzle"
+    typical_start_month: 9
+    typical_end_month: 10
+    temp_min_f: 55
+    temp_max_f: 70
+    conditions: [first_meaningful_rain, smoke_clearing, petrichor]
+    triggers: >
+      First rain event of more than a trace after the summer dry stretch.
+      Smoke washes out of the air within hours.
+    climate_drivers: [wildfire]
+
+  # ----- Triggered winter events -----
+  - microseason: "Find Bananas"
+    typical_start_month: 12
+    typical_end_month: 2
+    conditions: [snow_in_forecast, panic_buying]
+    triggers: >
+      Any forecaster utters the word "snow" within 72 hours. Bread, milk,
+      and — inexplicably — bananas vanish from QFC and Trader Joe's.
+    typical_duration_days: 2
+    is_nonlinear: true
+
+  - microseason: "Paralyzing Snow"
+    typical_start_month: 12
+    typical_end_month: 2
+    temp_max_f: 34
+    conditions: [snow_accumulation_over_half_inch, untreated_hills, abandoned_cars]
+    triggers: >
+      Any snow accumulation greater than 0.5 inches. Anything over 2 inches
+      is a regional emergency.
+    typical_duration_days: 3
+    is_nonlinear: true
+    can_be_amplified: true
+    climate_drivers: [arctic_outflow, fraser_outflow]
+    local_description: >
+      Seattle hills + zero road salt + drivers with no chain experience.
+      Buses jackknife on Capitol Hill.
+
+  # ----- First-sun events -----
+  - microseason: "Praise the Sun"
+    typical_start_month: 1
+    typical_end_month: 3
+    conditions: [any_direct_sun, after_extended_overcast]
+    triggers: >
+      First direct sun visible from downtown after 14+ consecutive overcast
+      days during The Long Dark / Dark Wet.
+    typical_duration_days: 1
+
+  - microseason: "Glorious Sun"
+    typical_start_month: 3
+    typical_end_month: 5
+    temp_min_f: 60
+    conditions: [direct_sun, warm_enough_to_feel_it, high_enough_solar_angle]
+    triggers: >
+      First sunny day above 60°F that's also high enough in the sky to
+      actually warm skin.
+    typical_duration_days: 1
+
+  # ----- Useless sun -----
+  - microseason: "Photon Fraud"
+    typical_start_month: 10
+    typical_end_month: 3
+    conditions: [direct_sun_visible, solar_elevation_below_30_degrees, UVB_negligible]
+    triggers: >
+      Sunny day between mid-October and mid-March when the sun never rises
+      above ~30° elevation in Seattle (47.6°N). UVB at that angle is almost
+      entirely absorbed by atmosphere — no vitamin D synthesis.
+
+  # ----- Constants -----
+  - microseason: "Spider Season"
+    typical_start_month: 8
+    typical_start_day: 15
+    typical_end_month: 10
+    typical_end_day: 31
+    conditions: [orb_weavers_at_full_size, mating_males_indoors]
+
+  - microseason: "Convergence Zones"
+    conditions: [localized_heavy_precip, lightning_possible, sharp_geographic_boundary]
+    local_description: >
+      Stationary band of heavy rain (or snow, or hail, or thunder) usually
+      pinned over Lynnwood/Everett. Five miles south: dry.
+
+  # ----- Climate disasters -----
+  - microseason: "Smogust"
+    typical_start_month: 8
+    typical_start_day: 1
+    typical_end_month: 8
+    typical_end_day: 31
+    conditions: [PM2_5_elevated, hazy_sky, orange_sun, smoke_smell]
+    triggers: >
+      August wildfires somewhere on the West Coast + easterly or southerly
+      flow pushes smoke into the Puget Sound basin. AQI commonly 100–250+.
+    climate_drivers: [wildfire]
+    can_be_amplified: true
+    can_be_skipped: true
+    is_nonlinear: true
+
+  - microseason: "Smoketember"
+    typical_start_month: 9
+    typical_start_day: 1
+    typical_end_month: 9
+    typical_end_day: 30
+    conditions: [PM2_5_elevated, hazy_sky, orange_sun, smoke_smell]
+    triggers: >
+      September smoke. Often worse than Smogust because high pressure parks
+      smoke in the basin for days.
+    climate_drivers: [wildfire]
+    can_be_amplified: true
+    can_be_skipped: true
+    is_nonlinear: true
+
+  - microseason: "Choking Smoke"
+    typical_start_month: 7
+    typical_end_month: 10
+    conditions: [AQI_over_150, visibility_under_3_miles, smoke_smell_indoors]
+    triggers: >
+      AQI exceeds ~150 from wildfire smoke. Can occur within Smogust /
+      Smoketember or independently.
+    climate_drivers: [wildfire]
+    can_be_amplified: true
+    is_nonlinear: true
+
+# ---------------------------------------------------------------------------
+# OVERLAPS  (per-city. Pairs of microseason CONCEPT NAMES that co-occur here.)
+# ---------------------------------------------------------------------------
+overlaps:
+  - [Spider Season, Smoketember, "Late-summer indoor spider migration coincides with smoke driving people indoors."]
+  - [Spider Season, Second Summer, "Peak orb weaver size during the warm September stretch."]
+  - [Spider Season, Smogust, "Spider Season often begins inside Smogust."]
+  - [Smoketember, Second Summer, "Smoke routinely cancels what would be the year's best weather."]
+  - [The Pollening, Spring of Deception, "Pollen ramps up during the second spring fake-out."]
+  - [The Pollening, Third Winter, "Allergy symptoms made worse by the cold-snap return."]
+  - [The Pollening, Actual Spring, "Peak pollen often lands inside Actual Spring."]
+  - [Juneuary, Actual Spring, "Juneuary directly follows and partially overlaps the back end of Actual Spring."]
+  - [Hell's Front Porch, Summer, "Heat domes happen inside the broader Summer window."]
+  - [Hell's Front Porch, Oppressive Sun, "Heat dome events are the extreme form of Oppressive Sun."]
+  - [Hell's Front Porch, Smogust, "Heat domes often pull smoke in behind them."]
+  - [The Long Dark, The Dark Wet, "Dark Wet is the rainy phase inside The Long Dark."]
+  - [The Long Dark, The Grey, "Both are overcast; The Grey precedes The Long Dark."]
+  - [The Long Dark, Photon Fraud, "Useless-sun days are most cruel inside The Long Dark."]
+  - [Find Bananas, Paralyzing Snow, "Find Bananas reliably precedes (and sometimes predicts) Paralyzing Snow."]
+  - [Praise the Sun, The Long Dark, "Praise the Sun events occur inside The Long Dark / Dark Wet."]
+  - [Convergence Zones, Paralyzing Snow, "Convergence zone snowfall is a common Paralyzing Snow mechanism."]
+  - [Welcome Drizzle, Smoketember, "Welcome Drizzle is what ends Smoketember."]
+  - [Welcome Drizzle, Smogust, "Can also end Smogust if it shows up early."]

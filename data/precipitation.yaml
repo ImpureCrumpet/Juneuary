@@ -1,0 +1,129 @@
+# Global precipitation vocabulary.
+#
+#   kind=intensity  : universal, applies everywhere.
+#   kind=pattern    : a named weather pattern. Which cities each pattern
+#                     applies to is set per-city in data/cities/<city>.yaml
+#                     under `precipitation_patterns:`.
+
+# ---------- INTENSITY SCALE (rank 1 = lightest, 10 = biblical) ----------
+
+- canonical_name: "Barely a Drop"
+  kind: intensity
+  intensity_rank: 1
+  precip_rate_in_per_hr_min: 0.0
+  precip_rate_in_per_hr_max: 0.005
+  description: >
+    A few stray drops on the windshield. Wipers on intermittent for 30
+    seconds then off forever. Locals do not acknowledge this as rain.
+
+- canonical_name: "Spitting Rain"
+  kind: intensity
+  intensity_rank: 2
+  precip_rate_in_per_hr_min: 0.005
+  precip_rate_in_per_hr_max: 0.01
+  description: >
+    Sparse, individually-visible drops. You'll get wet eventually but on
+    the timescale of a coffee.
+
+- canonical_name: "Sprinkling"
+  kind: intensity
+  intensity_rank: 3
+  precip_rate_in_per_hr_min: 0.01
+  precip_rate_in_per_hr_max: 0.03
+  description: >
+    Light, scattered, intermittent. PNWers hood up; tourists pull out
+    umbrellas and are quietly judged.
+
+- canonical_name: "Drizzling"
+  kind: intensity
+  intensity_rank: 4
+  precip_rate_in_per_hr_min: 0.03
+  precip_rate_in_per_hr_max: 0.1
+  description: >
+    Continuous fine rain. Reports say "trace amounts" while you are
+    completely soaked.
+
+- canonical_name: "Showers"
+  kind: intensity
+  intensity_rank: 5
+  precip_rate_in_per_hr_min: 0.1
+  precip_rate_in_per_hr_max: 0.25
+  description: >
+    On-again-off-again moderate rain with sun breaks between. Rainbow odds: high.
+
+- canonical_name: "Pissing Down"
+  kind: intensity
+  intensity_rank: 6
+  precip_rate_in_per_hr_min: 0.25
+  precip_rate_in_per_hr_max: 0.4
+  description: >
+    Steady, committed, will-not-let-up rain. Pant legs soak from the bottom.
+
+- canonical_name: "Downpour"
+  kind: intensity
+  intensity_rank: 7
+  precip_rate_in_per_hr_min: 0.4
+  precip_rate_in_per_hr_max: 0.8
+  description: >
+    Sheets. Storm drains briefly back up. You wait it out under an awning.
+
+- canonical_name: "Deluge"
+  kind: intensity
+  intensity_rank: 8
+  precip_rate_in_per_hr_min: 0.8
+  precip_rate_in_per_hr_max: 1.5
+  description: >
+    Streets pond. Visibility drops on the freeway. Roof gutters become
+    irrelevant.
+
+- canonical_name: "Torrential"
+  kind: intensity
+  intensity_rank: 9
+  precip_rate_in_per_hr_min: 1.5
+  precip_rate_in_per_hr_max: 3.0
+  description: >
+    Flash-flood warnings. Slope-stability advisories. The same neighborhood
+    that flooded last time floods again.
+
+- canonical_name: "Sideways"
+  kind: intensity
+  intensity_rank: 10
+  description: >
+    Any intensity, but wind-driven horizontally. Umbrellas invert and become
+    projectiles. Could be drizzle physically but sideways spiritually.
+
+# ---------- WEATHER PATTERNS (cities subscribe via cities/<city>.yaml) ----------
+
+- canonical_name: "Pineapple Express"
+  kind: pattern
+  description: >
+    Atmospheric river of subtropical moisture aimed at the West Coast from
+    near Hawaii. Warm, very wet, very persistent. Multi-day deluge events,
+    rapid snowmelt, lowland flooding.
+
+- canonical_name: "Fraser Valley Outflow"
+  kind: pattern
+  description: >
+    Cold, dry, often punishingly windy easterly flow draining BC's Fraser
+    Valley into northwest Washington. Drops temps fast; produces lowland
+    snow when it meets Pacific moisture.
+
+- canonical_name: "Convergence Zone"
+  kind: pattern
+  description: >
+    Westerly flow splits around the Olympics and re-collides over the Puget
+    Sound lowlands, producing a stationary narrow band of heavy
+    precipitation pinned over one neighborhood while five miles away is dry.
+
+- canonical_name: "Marine Layer Push"
+  kind: pattern
+  description: >
+    Onshore push of cool, moist air from the Pacific that floods through
+    coastal gaps (Golden Gate, the Strait of Juan de Fuca) and shuts down
+    the day's heat. The mechanism behind June Gloom, Fogust, and Juneuary.
+
+- canonical_name: "Diablo Winds"
+  kind: pattern
+  description: >
+    Hot, dry, northeasterly downslope winds in the Bay Area in fall. Bone-dry
+    fuels + gusts + PG&E equipment = the well-known result.

@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+.python-version
+*.egg-info/
+
+# uv
+uv.lock
+
+# SQLite (regenerated from YAML)
+db/*.db
+db/*.db-journal
+db/*.db-wal
+db/*.db-shm
+
+# Node (for future JS frontend)
+node_modules/
+dist/
+build/
+.pnpm-store/
+
+# Editor / OS
+.DS_Store
+.vscode/
+.idea/
+
+# Generated reports (commit reference + narrative examples)
+reports/*.md
+!reports/seattle_2026_ytd.md
+!reports/seattle_2026_ytd_narrative.md
+
+# Skills harness — native IDE discovery symlinks (machine-local)
+.agents/skills/
+.claude/skills/
+
+# Cursor
+.cursorrules

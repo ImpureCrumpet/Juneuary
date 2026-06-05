@@ -1,0 +1,236 @@
+# San Francisco. Placeholder pass — refine later.
+#
+# Demonstrates concept reuse: Spider Season, Smogust, Smoketember, Choking
+# Smoke, Welcome Drizzle, Hell's Front Porch, Oppressive Sun, Indian Summer
+# all reuse Seattle's concepts with SF-specific timing/thresholds.
+# SF-unique concepts (Karl the Fog, June Gloom, May Gray, Fogust, Rainy/Dry
+# Season) live in data/microseasons.yaml as global concepts and have
+# occurrences only here for now.
+
+city: san_francisco
+
+# 30-year climate normals. Numbers approximated from NOAA NCEI 1991-2020
+# normals for downtown SF (KSFO is colder/foggier; downtown is the cultural
+# baseline for "what San Francisco weather is"). The dry summer / wet winter
+# split is what makes June Gloom and Rainy Season microseasons.
+climate_normals:
+  period_start_year: 1991
+  period_end_year: 2020
+  source: "NOAA NCEI 1991-2020 (approximated, SF downtown)"
+  monthly:
+    1:  { temp_max_avg_f: 58, temp_min_avg_f: 46, temp_mean_f: 52, precip_total_in: 4.4, precip_days: 11, snow_total_in: 0.0, sun_pct: 60 }
+    2:  { temp_max_avg_f: 61, temp_min_avg_f: 48, temp_mean_f: 55, precip_total_in: 4.3, precip_days: 10, snow_total_in: 0.0, sun_pct: 64 }
+    3:  { temp_max_avg_f: 63, temp_min_avg_f: 49, temp_mean_f: 56, precip_total_in: 3.3, precip_days:  9, snow_total_in: 0.0, sun_pct: 70 }
+    4:  { temp_max_avg_f: 65, temp_min_avg_f: 50, temp_mean_f: 57, precip_total_in: 1.2, precip_days:  5, snow_total_in: 0.0, sun_pct: 76 }
+    5:  { temp_max_avg_f: 67, temp_min_avg_f: 52, temp_mean_f: 60, precip_total_in: 0.6, precip_days:  3, snow_total_in: 0.0, sun_pct: 73 }
+    6:  { temp_max_avg_f: 70, temp_min_avg_f: 54, temp_mean_f: 62, precip_total_in: 0.2, precip_days:  1, snow_total_in: 0.0, sun_pct: 70 }
+    7:  { temp_max_avg_f: 71, temp_min_avg_f: 55, temp_mean_f: 63, precip_total_in: 0.0, precip_days:  0, snow_total_in: 0.0, sun_pct: 68 }
+    8:  { temp_max_avg_f: 72, temp_min_avg_f: 57, temp_mean_f: 64, precip_total_in: 0.1, precip_days:  1, snow_total_in: 0.0, sun_pct: 70 }
+    9:  { temp_max_avg_f: 73, temp_min_avg_f: 56, temp_mean_f: 65, precip_total_in: 0.2, precip_days:  1, snow_total_in: 0.0, sun_pct: 75 }
+    10: { temp_max_avg_f: 70, temp_min_avg_f: 53, temp_mean_f: 62, precip_total_in: 1.0, precip_days:  4, snow_total_in: 0.0, sun_pct: 72 }
+    11: { temp_max_avg_f: 63, temp_min_avg_f: 49, temp_mean_f: 56, precip_total_in: 2.9, precip_days:  7, snow_total_in: 0.0, sun_pct: 62 }
+    12: { temp_max_avg_f: 57, temp_min_avg_f: 45, temp_mean_f: 51, precip_total_in: 4.0, precip_days: 10, snow_total_in: 0.0, sun_pct: 56 }
+
+precipitation_patterns:
+  - name: "Pineapple Express"
+  - name: "Marine Layer Push"
+  - name: "Diablo Winds"
+
+occurrences:
+
+  # ----- Mediterranean-climate calendar backbone -----
+  - microseason: "Rainy Season"
+    typical_start_month: 11
+    typical_start_day: 1
+    typical_end_month: 3
+    typical_end_day: 31
+    temp_min_f: 45
+    temp_max_f: 60
+    conditions: [steady_rain, atmospheric_rivers, occasional_storms]
+    climate_drivers: [atmospheric_river, el_nino, la_nina]
+    can_be_amplified: true
+    can_be_skipped: true
+    local_description: >
+      Essentially all of SF's annual precipitation arrives in these five
+      months, much of it from a handful of atmospheric river events.
+
+  - microseason: "Dry Season"
+    typical_start_month: 4
+    typical_start_day: 1
+    typical_end_month: 10
+    typical_end_day: 31
+    temp_min_f: 52
+    temp_max_f: 75
+    conditions: [no_rain, brown_hills, reservoir_anxiety]
+    local_description: >
+      Six-plus months where rain is genuinely a surprise. Hills turn gold,
+      then brown, then "fire danger".
+
+  # ----- Marine-layer spring/summer -----
+  - microseason: "May Gray"
+    typical_start_month: 5
+    typical_start_day: 1
+    typical_end_month: 5
+    typical_end_day: 31
+    temp_min_f: 50
+    temp_max_f: 65
+    conditions: [marine_layer, low_overcast, slow_burn_off]
+    climate_drivers: [marine_push]
+
+  - microseason: "June Gloom"
+    typical_start_month: 6
+    typical_start_day: 1
+    typical_end_month: 6
+    typical_end_day: 30
+    temp_min_f: 52
+    temp_max_f: 66
+    conditions: [persistent_fog, overcast, cool, drippy_eucalyptus]
+    climate_drivers: [marine_push]
+    local_description: >
+      Peak marine-layer month. Tourists arrive in shorts; locals wear hoodies.
+      Twin Peaks invisible from downtown for weeks.
+
+  - microseason: "Fogust"
+    typical_start_month: 8
+    typical_start_day: 1
+    typical_end_month: 8
+    typical_end_day: 31
+    temp_min_f: 54
+    temp_max_f: 68
+    conditions: [thick_fog, foghorn_audible, cold_wind_through_gate]
+    climate_drivers: [marine_push]
+    local_description: >
+      Marine layer at its most committed. Outer Sunset and Outer Richmond
+      live under a permanent grey ceiling while the East Bay hits 90°F.
+
+  - microseason: "Karl the Fog"
+    conditions: [marine_layer_evening_advance, golden_gate_pour_through]
+    triggers: >
+      Daily summer afternoon-into-night pattern: fog pours through the Golden
+      Gate and over the western half of the city, retreats by mid-morning.
+    local_description: >
+      Year-round-ish but defining in the summer. Has its own X account; has
+      had its own X account longer than X has had its own name.
+
+  # ----- The "real" summer (it isn't June) -----
+  - microseason: "Indian Summer"
+    typical_start_month: 9
+    typical_start_day: 1
+    typical_end_month: 10
+    typical_end_day: 15
+    temp_min_f: 58
+    temp_max_f: 82
+    conditions: [warm, dry, fog_retreats_offshore, golden_light]
+    local_description: >
+      SF's functional summer. The fog finally backs off and the city gets a
+      few weeks of 75-degree blue-sky days. Beach picnics that actually work.
+
+  - microseason: "Hell's Front Porch"
+    typical_start_month: 6
+    typical_end_month: 10
+    temp_min_f: 95
+    temp_max_f: 115
+    conditions: [heat_dome, no_AC_in_most_homes, smoke_likely, diablo_winds]
+    triggers: >
+      Heat dome or strong Diablo wind event drives Bay Area temps into the
+      100s. SF itself usually mid-90s; East Bay 105°F+. See: Sep 2017,
+      Sep 2022.
+    climate_drivers: [heat_dome, diablo_winds]
+    is_nonlinear: true
+    can_be_amplified: true
+    local_description: >
+      Hits SF less often than the East Bay but feels worse because almost
+      nothing west of the Bay has AC.
+
+  - microseason: "Oppressive Sun"
+    typical_start_month: 9
+    typical_end_month: 10
+    temp_min_f: 80
+    conditions: [bright, dry, dehydrating]
+    triggers: >
+      Extended Indian-Summer stretch of cloudless 80°F+ days, often with
+      offshore flow drying things further.
+    is_nonlinear: true
+    can_be_amplified: true
+
+  # ----- First rain after dry season -----
+  - microseason: "Welcome Drizzle"
+    typical_start_month: 10
+    typical_end_month: 11
+    temp_min_f: 55
+    temp_max_f: 70
+    conditions: [first_meaningful_rain, dust_settling, petrichor]
+    triggers: >
+      First measurable rain ending the long dry season; typically clears
+      late-summer smoke and tamps down fire danger.
+    climate_drivers: [wildfire]
+
+  # ----- Climate disasters (shared with Seattle as same concepts) -----
+  - microseason: "Smogust"
+    typical_start_month: 8
+    typical_start_day: 1
+    typical_end_month: 8
+    typical_end_day: 31
+    conditions: [PM2_5_elevated, hazy_sky, orange_sun, smoke_smell]
+    triggers: >
+      California wildfires + onshore or northerly flow pulls smoke into the
+      Bay. Often less severe in SF proper than in the inland valleys but the
+      marine layer can trap a smoke-fog hybrid.
+    climate_drivers: [wildfire]
+    can_be_amplified: true
+    can_be_skipped: true
+    is_nonlinear: true
+
+  - microseason: "Smoketember"
+    typical_start_month: 9
+    typical_start_day: 1
+    typical_end_month: 9
+    typical_end_day: 30
+    conditions: [PM2_5_elevated, hazy_sky, orange_sun, smoke_smell]
+    triggers: >
+      September smoke from Northern California / Sierra fires. The famous
+      orange-sky day (Sep 9, 2020) was this microseason at its most cinematic.
+    climate_drivers: [wildfire]
+    can_be_amplified: true
+    can_be_skipped: true
+    is_nonlinear: true
+
+  - microseason: "Choking Smoke"
+    typical_start_month: 8
+    typical_end_month: 11
+    conditions: [AQI_over_150, visibility_under_3_miles, smoke_smell_indoors]
+    triggers: >
+      AQI exceeds ~150 from wildfire smoke. Frequently coincides with Diablo
+      wind events.
+    climate_drivers: [wildfire, diablo_winds]
+    can_be_amplified: true
+    is_nonlinear: true
+
+  # ----- Constants -----
+  - microseason: "Spider Season"
+    typical_start_month: 9
+    typical_start_day: 1
+    typical_end_month: 11
+    typical_end_day: 15
+    conditions: [orb_weavers_at_full_size, webs_in_outdoor_doorways]
+    local_description: >
+      Shifted later than Seattle's; peaks in October. Less culturally
+      remarked-on but every Outer Sunset garage has the same tenants.
+
+# ---------------------------------------------------------------------------
+# OVERLAPS (per-city)
+# ---------------------------------------------------------------------------
+overlaps:
+  - [June Gloom, May Gray, "May Gray rolls directly into June Gloom; the boundary is fuzzy."]
+  - [June Gloom, Karl the Fog, "Karl is the daily mechanism of June Gloom at month scale."]
+  - [Fogust, Karl the Fog, "Same fog system, peak month."]
+  - [Fogust, Smogust, "August can be either fog or smoke (or both stacked)."]
+  - [Indian Summer, Smoketember, "SF's best weather routinely coincides with smoke season."]
+  - [Indian Summer, Hell's Front Porch, "Heat dome events typically fall inside Indian Summer."]
+  - [Indian Summer, Oppressive Sun, "Indian Summer is when Oppressive Sun shows up here."]
+  - [Spider Season, Indian Summer, "Peak orb weaver size during the warm dry stretch."]
+  - [Spider Season, Smoketember, "Indoor migration coincides with smoke driving people indoors."]
+  - [Welcome Drizzle, Smoketember, "Welcome Drizzle ends Smoketember (when it arrives on time)."]
+  - [Welcome Drizzle, Dry Season, "Welcome Drizzle marks the transition out of Dry Season."]
+  - [Rainy Season, Dry Season, "These bracket each other; not concurrent but defining transitions."]
+  - [Hell's Front Porch, Choking Smoke, "Heat events and Diablo winds frequently bring smoke."]

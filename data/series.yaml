@@ -1,0 +1,42 @@
+# Series let Fool's Spring, Spring of Deception, and Actual Spring all share a
+# parent ("spring") while alternating with Second Winter / Third Winter.
+- key: winter
+  name: Winter
+  description: >
+    The actual cold season AND its recursive reappearances (Second Winter,
+    Third Winter, ...). Alternates with the spring series Jan–Apr.
+  is_alternating: true
+
+- key: spring
+  name: Spring
+  description: >
+    The teasing fake-outs (Fool's Spring, Spring of Deception) and the eventual
+    Actual Spring. Alternates with Second/Third Winter.
+  is_alternating: true
+
+- key: summer
+  name: Summer
+  description: >
+    Real summer plus its echoes (Second Summer, the Hell's Front Porch heat dome).
+  is_alternating: false
+
+- key: fall
+  name: Fall
+  description: >
+    False Fall, then a return to Second Summer, then Actual Fall.
+  is_alternating: true
+
+- key: first_sun
+  name: First-Sun Events
+  description: >
+    Discrete "the sun came back" moments. Praise the Sun = first ANY sun after
+    The Long Dark. Glorious Sun = first sun that's actually warm/good.
+  is_alternating: false
+
+- key: low_sun
+  name: Useless-Sun Phenomena
+  description: >
+    Days where the sun is technically out but the solar elevation angle is too
+    low for meaningful vitamin D synthesis. All entries here are colloquial
+    synonyms for the same phenomenon.
+  is_alternating: false

@@ -1,0 +1,22 @@
+# Cities scoped by this dataset. Each city has a per-city YAML at
+# data/cities/<slug>.yaml describing which microseasons occur there.
+
+- slug: seattle
+  name: "Seattle, WA"
+  latitude: 47.6062
+  longitude: -122.3321
+  notes: >
+    Patient zero for codified microseasons. Marine west-coast climate,
+    Puget Sound Convergence Zone, Olympic rain shadow, and an annual smoke
+    season courtesy of the rest of the West Coast burning down.
+
+- slug: san_francisco
+  name: "San Francisco, CA"
+  latitude: 37.7749
+  longitude: -122.4194
+  notes: >
+    Mediterranean climate (dry summers, wet winters), defined by a daily
+    marine-layer cycle through the Golden Gate. Microseasons revolve around
+    fog (May Gray, June Gloom, Fogust) rather than dark/wet phases. Shares
+    the Smogust/Smoketember/Choking Smoke axis with the rest of the
+    West Coast and adds Diablo Winds.

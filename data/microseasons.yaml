@@ -1,0 +1,353 @@
+# GLOBAL CATALOG of microseason CONCEPTS.
+# City-specific timing, temps, triggers, and climate sensitivity live in
+# data/cities/<city>.yaml under `occurrences:` — NOT here.
+#
+# A concept can exist without any occurrences (defined but not yet observed
+# in any city in this dataset). A city decides which concepts manifest there
+# by adding occurrence rows.
+
+# ============================================================================
+# WINTER SERIES
+# ============================================================================
+
+- canonical_name: "Winter"
+  category: series
+  series: winter
+  series_order: 1
+  series_label: winter1
+  description: >
+    The actual cold season. The baseline that all the fake springs and
+    second/third winters are measured against.
+
+- canonical_name: "Second Winter"
+  category: series
+  series: winter
+  series_order: 2
+  series_label: winter2
+  description: >
+    The first cold-snap return after a spring fake-out. Coats come back out;
+    early cherry blossoms get nuked.
+
+- canonical_name: "Third Winter"
+  category: series
+  series: winter
+  series_order: 3
+  series_label: winter3
+  description: >
+    The final cold-snap insult after Spring of Deception. Frequently includes
+    a dramatic hailstorm during something outdoors that mattered.
+
+# ============================================================================
+# SPRING SERIES
+# ============================================================================
+
+- canonical_name: "Fool's Spring"
+  aliases: ["Faux Spring", "False Spring"]
+  category: series
+  series: spring
+  series_order: 1
+  series_label: spring1
+  description: >
+    The first lie spring tells you. A few warm sunny days that convince
+    everyone to plant tomatoes. Always followed by Second Winter.
+
+- canonical_name: "Spring of Deception"
+  category: series
+  series: spring
+  series_order: 2
+  series_label: spring2
+  description: >
+    Same lie as Fool's Spring, told with more conviction. People uncover
+    their patio furniture. Third Winter is already loading.
+
+- canonical_name: "The Pollening"
+  category: series
+  series: spring
+  series_order: 3
+  series_label: spring2_5
+  description: >
+    Cars, decks, dogs, and lungs go yellow-green. Allergy meds become a
+    personality. Defined by pollen count, not temperature.
+
+- canonical_name: "Actual Spring"
+  category: series
+  series: spring
+  series_order: 4
+  series_label: spring3
+  description: >
+    The real one. Brief. Always shorter than expected.
+
+# ============================================================================
+# SUMMER + HEAT
+# ============================================================================
+
+- canonical_name: "Juneuary"
+  category: calendar
+  description: >
+    A reliably cool, cloudy, drizzly stretch in June while the rest of the
+    continent is at the pool. Caused by marine layer / cold-current upwelling.
+  notes: >
+    Seattle-coined; the project's namesake. SF's analogous (but distinct)
+    phenomenon is June Gloom.
+
+- canonical_name: "Summer"
+  category: series
+  series: summer
+  series_order: 1
+  series_label: summer1
+  description: >
+    The brief, perfect window of dry warm sun. The reason anyone tolerates
+    the rest of the year.
+
+- canonical_name: "Hell's Front Porch"
+  category: triggered_event
+  description: >
+    The version of summer climate change keeps mailing us — multi-day heat
+    dome events with 90°F+ days and tropical nights, in cities that mostly
+    weren't built for AC.
+
+- canonical_name: "Oppressive Sun"
+  category: triggered_event
+  description: >
+    Extended stretch of bright, dry, dehydrating heat. Less acute than a heat
+    dome but more attritional. Curtains drawn at noon, dogs refuse walks.
+
+# ============================================================================
+# FALL
+# ============================================================================
+
+- canonical_name: "False Fall"
+  category: series
+  series: fall
+  series_order: 1
+  series_label: fall1
+  description: >
+    A cool, drizzly stretch in late August that tricks you into PSL season.
+    A return of summer is coming for your iced drink.
+
+- canonical_name: "Second Summer"
+  category: series
+  series: fall
+  series_order: 2
+  series_label: fall2
+  description: >
+    Two-to-four weeks of perfect warm-and-dry days after False Fall.
+    Frequently the best weather of the year. Frequently ruined by smoke.
+
+- canonical_name: "Indian Summer"
+  category: calendar
+  description: >
+    A pronounced warm, dry, golden-light period in early fall. In some
+    Mediterranean-climate cities (SF) this is functionally "the real summer".
+
+- canonical_name: "Actual Fall"
+  aliases: ["Autumn"]
+  category: series
+  series: fall
+  series_order: 3
+  series_label: fall3
+  description: >
+    The platonic crunchy-leaves cold-morning version of fall. Lasts about
+    three weeks before The Grey absorbs everything.
+
+# ============================================================================
+# WET / DARK PROGRESSION
+# ============================================================================
+
+- canonical_name: "The Grey"
+  category: calendar
+  description: >
+    Featureless dome of cloud that slides in and parks overhead. Not raining,
+    not clearing, just gray. For weeks.
+
+- canonical_name: "The Long Dark"
+  category: calendar
+  description: >
+    Solstice-adjacent stretch of very short days under a thick lid of cloud.
+    Vitamin D supplements and dawn-simulator alarms become essential.
+
+- canonical_name: "The Dark Wet"
+  category: calendar
+  description: >
+    The Long Dark's wetter sibling. The rain phase of deep winter — drizzly,
+    persistent, gloves-soak-through cold.
+
+- canonical_name: "Brightening Wet"
+  category: calendar
+  description: >
+    Same rain as The Dark Wet but the sun sets later now, and that changes
+    everything.
+
+- canonical_name: "Molding Wet"
+  category: calendar
+  description: >
+    Warm enough that anything left outside gets a fuzzy green coat. Patio
+    cushions, gardening gloves, that one boot.
+
+- canonical_name: "Flowering Wet"
+  category: calendar
+  description: >
+    Rain plus blossoms plus a 45-minute golden sunbreak that makes you
+    forgive everything.
+
+- canonical_name: "Welcome Drizzle"
+  category: triggered_event
+  description: >
+    First meaningful rain after the summer dry stretch. The only rain locals
+    actively cheer for. Smells like petrichor and relief; smoke evacuates
+    the basin within hours.
+
+- canonical_name: "Rainy Season"
+  category: calendar
+  description: >
+    The wet half of a Mediterranean-climate calendar — months where
+    essentially all the year's precipitation arrives, often via atmospheric
+    rivers.
+
+- canonical_name: "Dry Season"
+  category: calendar
+  description: >
+    The dry half of a Mediterranean-climate calendar — months where rain is
+    a surprise. Reservoir-watching season.
+
+# ============================================================================
+# TRIGGERED WINTER EVENTS
+# ============================================================================
+
+- canonical_name: "Find Bananas"
+  category: triggered_event
+  description: >
+    The pre-blizzard grocery-store stampede when any snow appears in the
+    forecast. Bread, milk, and — inexplicably — bananas vanish.
+  notes: >
+    Seattle insider joke (bananas specifically). Other cities have their
+    own version with different doomed produce.
+
+- canonical_name: "Paralyzing Snow"
+  category: triggered_event
+  description: >
+    Any snow accumulation a city is not equipped to handle. In low-snow
+    cities this can be as little as half an inch.
+
+# ============================================================================
+# FIRST-SUN EVENTS (discrete moments, not spans)
+# ============================================================================
+
+- canonical_name: "Praise the Sun"
+  category: triggered_event
+  series: first_sun
+  series_order: 1
+  series_label: first_sun_any
+  description: >
+    First moment of direct sun visible after an extended overcast stretch.
+    Office workers stand at windows like houseplants.
+
+- canonical_name: "Glorious Sun"
+  category: triggered_event
+  series: first_sun
+  series_order: 2
+  series_label: first_sun_good
+  description: >
+    First sun that's also warm enough to actually feel. Every patio in town
+    fills within twenty minutes; collective serotonin spike measurable from
+    orbit.
+
+# ============================================================================
+# SUN-WITHOUT-VITAMIN-D
+# ============================================================================
+
+- canonical_name: "Photon Fraud"
+  aliases: ["The Empty Bright", "SAD Sun", "Solar Deficiency", "Bright Nothing"]
+  category: sun_phenomenon
+  series: low_sun
+  series_order: 1
+  series_label: low_sun_useless
+  description: >
+    Bright sunny day where the sun is too low in the sky to drive meaningful
+    vitamin D synthesis (solar elevation roughly < 30°). Looks like a beach
+    day from inside; biologically gives you nothing.
+  notes: >
+    A high-latitude phenomenon. Severe in Seattle (47.6°N); barely applies in
+    SF (37.8°N) where winter sun still clears the threshold most days.
+
+# ============================================================================
+# CONSTANTS / RECURRING TRAITS
+# ============================================================================
+
+- canonical_name: "Spider Season"
+  aliases: ["Spiders"]
+  category: constant
+  description: >
+    Late-summer-through-mid-fall ramp: orb weavers reach maximum size and
+    string webs across every doorway at face height. Males wander indoors
+    looking for mates. Showers become stochastic horror.
+
+- canonical_name: "Convergence Zones"
+  aliases: ["Convergence Zone", "Puget Sound Convergence Zone", "PSCZ"]
+  category: constant
+  description: >
+    Year-round Puget Sound specialty. Westerly flow splits around the
+    Olympics and re-collides over the lowlands, producing a stationary band
+    of heavy precipitation pinned over one neighborhood while the next
+    neighborhood is dry.
+  notes: >
+    Inherently Seattle-region; included as a concept anyway since the data
+    model supports city-unique concepts.
+
+- canonical_name: "Karl the Fog"
+  aliases: ["Karl", "The Fog"]
+  category: constant
+  description: >
+    The Bay Area's anthropomorphized marine-layer fog. Pours through the
+    Golden Gate most summer afternoons, blanketing the western half of the
+    city while the East Bay bakes. Has its own social-media following.
+
+# ============================================================================
+# MARINE-LAYER SPRING/SUMMER (Mediterranean-climate cities)
+# ============================================================================
+
+- canonical_name: "May Gray"
+  category: calendar
+  description: >
+    Late-spring overcast ramp as the marine layer thickens. Cool mornings
+    that don't burn off until afternoon, if at all.
+
+- canonical_name: "June Gloom"
+  category: calendar
+  description: >
+    Peak marine-layer month. Persistent fog and overcast just as the rest of
+    the country starts summer. Similar in vibe to Juneuary but mechanistically
+    a marine-layer/coastal-fog phenomenon rather than generalized cool June.
+
+- canonical_name: "Fogust"
+  category: calendar
+  description: >
+    The Bay Area's August fog season — the marine layer at its most
+    committed. Locals wear hoodies; tourists in Alcatraz line shiver in
+    sleeveless shirts.
+  notes: >
+    Naming rhyme with Smogust is coincidental and excellent.
+
+# ============================================================================
+# CLIMATE DISASTERS (West-Coast-wide)
+# ============================================================================
+
+- canonical_name: "Smogust"
+  aliases: ["Smaugust"]
+  category: climate_disaster
+  description: >
+    August wildfire-smoke season. What used to be the best month is now a
+    coin flip with smoke. "Smaugust" if you prefer your apocalypse with a
+    dragon.
+
+- canonical_name: "Smoketember"
+  category: climate_disaster
+  description: >
+    September equivalent of Smogust. Often worse because high pressure parks
+    smoke for days. Frequently ruins Second Summer / Indian Summer.
+
+- canonical_name: "Choking Smoke"
+  category: triggered_event
+  description: >
+    Acute wildfire-smoke event: AQI > ~150, visibility under three miles,
+    horror-movie red sun at noon. MERV-13 filters sell out.
