@@ -1,0 +1,4 @@
+# Consumer-owned metadata for the skills harness install.
+kit_version: "1.1.2"
+role: consumer
+repo_url: "https://github.com/ImpureCrumpet/Juneuary"

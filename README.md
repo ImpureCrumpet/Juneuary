@@ -11,6 +11,7 @@ Hell's Front Porch are one row each globally).
 
 - **Data layer**: SQLite, generated from YAML source-of-truth files.
 - **Build**: Python 3.12 via `uv`.
+- **Agent skills**: [skills-harness](https://github.com/Gargoyle-Apps/skills-harness) vendored at `.skills-harness/` (git subtree); project skills under `.skills/_skills/j-*`.
 - **Frontend (planned)**: Node 24 + pnpm (framework TBD).
 
 ## Project layout
@@ -33,7 +34,23 @@ scripts/
   fetch_weather.py            Open-Meteo client: fetch + classify + persist
   classify.py                 shared classifier (primary/secondary/triggered)
   solar.py                    solar geometry (declination + max elevation)
+  report.py                   YTD tabular markdown report from DB
+.skills/                      agent skills (harness + j-* project skills)
+.skills-harness/              vendored skills-harness kit (git subtree)
 ```
+
+## Agent skills
+
+Vendored from [Gargoyle-Apps/skills-harness](https://github.com/Gargoyle-Apps/skills-harness) via git subtree. Cursor loads the harness from `AGENTS.md`; the index is `.skills/_index.md`.
+
+| Skill | Purpose |
+|-------|---------|
+| `j-weather-sync` | Fetch Open-Meteo → SQLite, re-classify |
+| `j-ytd-report` | Tabular YTD markdown report |
+| `j-narrative-report` | Human narrative + season timeline |
+| `j-report-review` | Verify reports against live Open-Meteo |
+
+Update the kit: `git subtree pull --prefix=.skills-harness skills-harness main --squash` (see **harness-subtree** skill).
 
 ## Quick start
 
