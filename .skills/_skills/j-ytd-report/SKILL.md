@@ -10,39 +10,51 @@ triggers:
   - write up the year
   - seattle report
 dependencies:
-  - j-weather-sync
   - j-report-review
-version: "2.3.0"
+version: "3.0.0"
 ---
 
 # YTD Report
 
+> **Branch:** this skill and `scripts/report.py` live on the `report-builder`
+> branch. `main` is just db + logic + api.
+
 ## When to use this skill
 
 Load when the user wants a **year-to-date microseasons report** for a city and period.
-This repo is report-first: the output should read like a local wrote it, using the
-taxonomy vernacular (**Find Bananas**, **Paralyzing Snow**, **Fool's Spring**,
-**Juneuary**, **Welcome Drizzle**, **The Long Dark**, etc.) — not dry meteorology.
-Every section uses **text-passable UTF-8 emoji** (🍌 **Find Bananas**, 📋 section
-headings, 🌧️ precip rows) so reports read well in GitHub, terminals, and plain text.
+The output should read like a local wrote it, using the taxonomy vernacular
+(**Find Bananas**, **Paralyzing Snow**, **Fool's Spring**, **Juneuary**,
+**Welcome Drizzle**, **The Long Dark**, etc.) — not dry meteorology. Every section
+uses **text-passable UTF-8 emoji** (🍌 **Find Bananas**, 📋 section headings,
+🌧️ precip rows) so reports read well in GitHub, terminals, and plain text.
 
 One file: `reports/<city>_<year>_ytd.md` (gitignored except `reports/.gitkeep`).
 
-## Prerequisites
+## Architecture (important)
 
-1. **j-weather-sync** — observations in DB for the city and date range.
-2. **j-report-review** — verify DB matches live Open-Meteo before publishing.
+`report.py` is a **pure consumer of the Juneuary API**. It does NOT read the DB
+or call Open-Meteo directly. It boots the API in-process (or targets `--api-url`),
+pulls a classified range from `/v1/days` (which fetches Open-Meteo and classifies
+internally) and normals from `/v1/normals`, then renders through the narrative
+templates. So generating a report is also an end-to-end test of the API contract.
+
+## Prerequisites
 
 ```bash
 uv sync
-uv run scripts/build_db.py   # if DB missing
+uv run scripts/build_db.py   # builds the catalog DB the API serves (no observations needed)
 ```
+
+No `j-weather-sync` needed: `/v1/days` fetches Open-Meteo live at render time.
+(Network is required for the run.)
 
 ## Generate
 
 ```bash
 uv run scripts/report.py --city seattle --year 2019
 uv run scripts/report.py --city seattle --through 2026-06-05
+# Against a separately running server instead of an in-process one:
+uv run scripts/report.py --city seattle --year 2019 --api-url http://localhost:8787
 # Neighborhood-level slugs live in gitignored data/cities.local.yaml:
 uv run scripts/report.py --city seattle_neighborhood --year 2019
 ```
@@ -90,9 +102,12 @@ Reports use **text-passable UTF-8 emoji** (GitHub, terminals, plain text) via
 - Narrative terms: 🌨️ **snowmageddon**, ❄️ **snow siege**, 🍌 **banana weather**
 - Stats rows and notable-day blocks get row-level emoji (🌧️ precip, 🔥 hottest, …)
 
-`emojify()` and `tag()` in `report.py` are the source of truth — extend `MS_EMOJI`,
-`TERM_EMOJI`, `SECTION_EMOJI`, or `STAT_ROW_EMOJI` when adding new taxonomy terms.
-Do **not** hand-add emoji in generated markdown; let the generator apply them consistently.
+`emojify()` and `tag()` in `report.py` apply emoji. Microseason → emoji comes
+from `data/presentation.yaml` (the shared presentation catalog, via
+`juneuary.presentation.emoji_map()`) — add new concept emoji there, not in
+`report.py`. `TERM_EMOJI`, `SECTION_EMOJI`, and `STAT_ROW_EMOJI` (narrative
+terms, headings, stat rows) still live in `report.py`. Do **not** hand-add emoji
+in generated markdown; let the generator apply them consistently.
 `emojify()` runs once at the end of `main()` on the assembled document — sub-renderers
 produce raw text. The replacement is idempotent (multi-pass safe).
 
@@ -121,11 +136,13 @@ climate normals, and narrative templates via `v_catalog_city`. Neighborhood
 ## If `report.py` prose feels thin
 
 The generator uses heuristics from classified data and templates from
-`data/cities/<catalog_slug>.yaml#narrative`. For landmark years (e.g. Feb 2019
+`data/cities/<catalog_slug>.narrative.yaml`. For landmark years (e.g. Feb 2019
 snowmageddon), the auto prose should suffice after classification. If a specific
-lived-experience detail matters, **edit the YAML**, not the Python — the voice lives
-in `narrative.months`, `narrative.chunks`, `narrative.ytd_*`, etc. The Python only
-computes features (snow_label, peak_*, d_hi, …) and dispatches to the templates.
+lived-experience detail matters, **edit the narrative YAML**, not the Python — the
+voice lives in `narrative.months`, `narrative.chunks`, `narrative.ytd_*`, etc. The
+Python only computes features (snow_label, peak_*, d_hi, …) and dispatches to the
+templates. Child cities inherit the parent's narrative (the API resolves the
+parent via `catalog_slug`).
 
 ## Examples
 

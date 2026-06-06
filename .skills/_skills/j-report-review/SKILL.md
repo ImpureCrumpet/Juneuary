@@ -7,20 +7,23 @@ triggers:
   - verify against open-meteo
   - report code review
   - is the report right
-dependencies:
-  - j-weather-sync
-version: "1.0.0"
+version: "2.0.0"
 ---
 
 # Report Accuracy Review
 
+> **Branch:** lives on `report-builder` alongside `scripts/report.py`.
+
 ## When to use this skill
 
 Load when the user asks whether a report is **accurate**, **correct**, or
-**matches reality**. Internal DB consistency is necessary but not sufficient —
-the DB can be stale on forecast-era dates.
+**matches reality**.
 
 **Accuracy means matching Open-Meteo**, not matching a previous report export.
+Note the report now pulls its data live through the API's `/v1/days` (which
+fetches Open-Meteo itself), so a freshly built report reflects current
+Open-Meteo — the review is mostly checking that the rendered numbers agree with
+an independent fetch and that the narrative claims hold.
 
 ## Instructions
 
@@ -65,12 +68,12 @@ Flag when any of:
 
 ### 4. If drift found
 
-1. Re-fetch the stale window **without** `--skip-existing`.
-2. Re-run `report.py` if tabular output is stale.
-3. Document the drift in narrative reports (forecast-era caveat).
-
-Typical drift: **late May / early June** when forecast rows were cached days
-ago. Jan–Apr archive data is usually stable.
+Because the report fetches live via `/v1/days`, simply **rebuild the report**
+(`uv run scripts/report.py ...`) to pick up the latest Open-Meteo data, then
+re-diff. Forecast-era days (the most recent ~week) can shift between runs;
+document that caveat for any report covering them. Jan–Apr archive data is
+usually stable. (DB staleness only affects `/v1/state` and `/v1/forecast`,
+which read stored observations — not the report.)
 
 ### 5. Verify monthly aggregates against OM (not report rounding)
 
