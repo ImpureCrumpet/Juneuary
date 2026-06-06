@@ -1,5 +1,9 @@
 # Cities scoped by this dataset. Each city has a per-city YAML at
 # data/cities/<slug>.yaml describing which microseasons occur there.
+#
+# Personal / neighborhood-level entries (grid cells, ZIPs, blocks) live
+# in a gitignored `data/cities.local.yaml` — see
+# `data/cities.local.example.yaml` for the schema.
 
 - slug: seattle
   name: "Seattle, WA"
@@ -10,14 +14,6 @@
     Puget Sound Convergence Zone, Olympic rain shadow, and an annual smoke
     season courtesy of the rest of the West Coast burning down.
 
-- slug: seattle_neighborhood
-  name: "Seattle, WA (NNNNN)"
-  latitude: 47.NNNN
-  longitude: -122.NNNN
-  notes: >
-    NEIGHBORHOOD / NEIGHBORHOOD / NEIGHBORHOOD (ZIP NNNNN). Same microseason
-    catalog as city-center Seattle; weather from Open-Meteo grid cell near
-    47.NN°N, -122.NN°W (convergence-zone north end).
 
 - slug: san_francisco
   name: "San Francisco, CA"

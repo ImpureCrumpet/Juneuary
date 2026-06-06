@@ -194,17 +194,20 @@ def cmd_rain(conn, city):
 
 
 def cmd_cities(conn, _city):
+    # Catalog-aware: child cities show inherited occurrence count + parent slug.
     sql = """
         SELECT c.slug, c.name, c.latitude, c.longitude,
-               COUNT(o.id) AS n_occurrences
+               (SELECT slug FROM cities WHERE id = c.parent_city_id) AS parent_slug,
+               (SELECT COUNT(*) FROM microseason_occurrences o
+                 WHERE o.city_id = COALESCE(c.parent_city_id, c.id)) AS n_occurrences
         FROM cities c
-        LEFT JOIN microseason_occurrences o ON o.city_id = c.id
-        GROUP BY c.id ORDER BY c.slug
+        ORDER BY c.slug
     """
-    print(f"  {'slug':<18} {'name':<22} {'lat':>8} {'lng':>10}  occurrences")
+    print(f"  {'slug':<18} {'name':<22} {'lat':>8} {'lng':>10}  occ  inherits")
     for r in conn.execute(sql):
+        inh = f"← {r['parent_slug']}" if r["parent_slug"] else ""
         print(f"  {r['slug']:<18} {r['name']:<22} {r['latitude']:>8.4f} "
-              f"{r['longitude']:>10.4f}  {r['n_occurrences']}")
+              f"{r['longitude']:>10.4f}  {r['n_occurrences']:>3}  {inh}")
 
 
 def cmd_concepts(conn, _city):
@@ -305,16 +308,21 @@ def cmd_find(conn, _city, query):
 
 
 def cmd_normals(conn, city):
-    where, args = ("WHERE c.slug = ?", [city]) if city else ("", [])
+    # Catalog-aware: child cities show parent's normals; the (inherited)
+    # banner makes the inheritance visible.
+    where, args = ("WHERE vc.city_slug = ?", [city]) if city else ("", [])
     sql = f"""
-        SELECT c.slug AS city_slug, c.name AS city_name,
+        SELECT vc.city_slug                                  AS city_slug,
+               vc.city_name                                  AS city_name,
+               (vc.city_id != vc.catalog_city_id)            AS inherited,
+               (SELECT slug FROM cities WHERE id = vc.catalog_city_id) AS parent_slug,
                n.month, n.temp_max_avg_f, n.temp_min_avg_f, n.temp_mean_f,
                n.precip_total_in, n.precip_days, n.snow_total_in, n.sun_pct,
                n.period_start_year, n.period_end_year, n.source
-        FROM city_climate_normals n
-        JOIN cities c ON c.id = n.city_id
+        FROM v_catalog_city vc
+        JOIN city_climate_normals n ON n.city_id = vc.catalog_city_id
         {where}
-        ORDER BY c.slug, n.month
+        ORDER BY vc.city_slug, n.month
     """
     current_city = None
     for r in conn.execute(sql, args):
@@ -323,7 +331,8 @@ def cmd_normals(conn, city):
             period = ""
             if r["period_start_year"] and r["period_end_year"]:
                 period = f"  ({r['period_start_year']}–{r['period_end_year']})"
-            print(f"\n=== {r['city_name']}{period} ===")
+            inh = f"  (inherited from {r['parent_slug']})" if r["inherited"] else ""
+            print(f"\n=== {r['city_name']}{period}{inh} ===")
             if r["source"]:
                 print(f"    source: {r['source']}")
             print(f"    {'mo':<4}{'hi':>5}{'lo':>5}{'mean':>6}{'precip':>9}"

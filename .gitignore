@@ -30,6 +30,12 @@ build/
 reports/*
 !reports/.gitkeep
 
+# Local-only city / neighborhood configs. Neighborhood-specific entries
+# (grid cells, ZIPs, blocks) are PII-adjacent and stay on disk only.
+# See data/cities.local.example.yaml for the schema.
+data/cities.local.yaml
+data/cities/*.local.yaml
+
 # Skills harness — native IDE discovery symlinks (machine-local)
 .agents/skills/
 .claude/skills/

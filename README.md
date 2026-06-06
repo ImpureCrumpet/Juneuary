@@ -18,13 +18,16 @@ Hell's Front Porch are one row each globally).
 
 ```
 data/
-  cities.yaml                 city metadata (one row per city)
+  cities.yaml                 city metadata (one row per city; child grids reference parent_slug)
   series.yaml                 named series (winter, spring, fall, ...)
   microseasons.yaml           GLOBAL CONCEPTS (city-independent)
   precipitation.yaml          rain intensity scale + named patterns
   cities/
-    seattle.yaml              per-city: occurrences + overlaps + patterns + normals
+    seattle.yaml              per-city: occurrences + overlaps + patterns + normals + narrative
     san_francisco.yaml        per-city: occurrences + overlaps + patterns + normals
+    # Neighborhood / grid-cell children live in the gitignored
+    # data/cities.local.yaml (see data/cities.local.example.yaml) and
+    # inherit catalog + normals + narrative via parent_slug.
 db/
   schema.sql                  SQLite schema (the DDL is the spec)
   microseasons.db             generated; gitignored
@@ -51,7 +54,7 @@ Vendored from [Gargoyle-Apps/skills-harness](https://github.com/Gargoyle-Apps/sk
 
 Update the kit: `git subtree pull --prefix=.skills-harness skills-harness main --squash` (see **harness-subtree** skill).
 
-Reports are written to `reports/` (gitignored except `.gitkeep`). Use `seattle` for city-center coords or `seattle_neighborhood` for ZIP NNNNN (NEIGHBORHOOD).
+Reports are written to `reports/` (gitignored except `.gitkeep`). Use `seattle` for city-center coords; add neighborhood-level grid cells to a gitignored `data/cities.local.yaml` (see `data/cities.local.example.yaml`).
 
 ## Quick start
 
@@ -82,9 +85,9 @@ uv run scripts/query.py --city seattle propose 1 31 22 --snow 1.0               
 uv run scripts/query.py --city san_francisco propose 3 85 60                            # SF heat anomaly -> propose new
 
 # Live data: fetch from Open-Meteo, classify, store
-uv run scripts/fetch_weather.py --all --days 14            # both cities, last 14 days
-uv run scripts/fetch_weather.py --city seattle --days 30   # Seattle, last 30 days
-uv run scripts/fetch_weather.py --city seattle --start 2026-04-01 --end 2026-04-30
+uv run scripts/fetch_weather.py --all --days 14 --skip-existing            # both cities, last 14 days; skip days already on file
+uv run scripts/fetch_weather.py --city seattle --days 30 --skip-existing   # Seattle, last 30 days
+uv run scripts/fetch_weather.py --city seattle --start 2026-04-01 --end 2026-04-30 --skip-existing
 
 # Sequence tracking against fetched observations
 uv run scripts/query.py --city seattle active           # most recent day's classification
@@ -344,26 +347,55 @@ spring fakeouts because there's no proper winter to be relieved from.
 
 ### Adding a new city
 
+**Independent city** (its own catalog):
+
 1. Add a row to `data/cities.yaml`.
-2. Create `data/cities/<slug>.yaml` with `occurrences:`, `overlaps:`, and
-   `precipitation_patterns:`.
+2. Create `data/cities/<slug>.yaml` with `occurrences:`, `overlaps:`,
+   `precipitation_patterns:`, and ideally `climate_normals:` + `narrative:`.
 3. If you need a brand-new concept that doesn't already exist (a city-unique
    microseason), add it to `data/microseasons.yaml` as a concept first, then
    give it an occurrence in your new city file.
 4. `uv run scripts/build_db.py`.
 
-The loader will reject occurrences that reference unknown concepts and warn
-on overlap pairs whose concepts have no occurrence in that city.
+**Sibling city / grid cell** (shares an existing city's catalog):
+
+Neighborhood-level entries (grid cells, ZIPs, blocks) belong in a
+**gitignored** `data/cities.local.yaml` so they never get committed.
+See `data/cities.local.example.yaml` for the schema. The example boils
+down to one block:
+
+```yaml
+- slug: seattle_neighborhood
+  name: "Seattle, WA (neighborhood)"
+  latitude:  47.6XXX
+  longitude: -122.3XXX
+  parent_slug: seattle    # inherits catalog + normals + narrative voice
+```
+
+`scripts/build_db.py` merges `cities.local.yaml` on top of `cities.yaml`
+automatically. No per-city YAML required. Occurrences, climate normals,
+and narrative templates resolve through `v_catalog_city` at query time.
+Observations are still scoped to the child (independent grid cell), so
+anomaly + last-seen data is local even when the catalog isn't. Optional
+per-grid normals override: drop a `data/cities/<slug>.local.yaml` with
+just `climate_normals:` (also gitignored).
+
+The loader rejects occurrences that reference unknown concepts, child
+cities that try to define their own occurrences/overlaps, and warns on
+overlap pairs whose concepts have no occurrence in that city.
 
 ## Current dataset
 
-- 2 cities (Seattle, San Francisco placeholder)
-- 38 concepts, 8 shared between both cities
-- 45 occurrences (31 Seattle + 14 San Francisco)
-- 32 overlap pairs
-- 15 precipitation types (10 universal intensities + 5 patterns)
-- 7 pattern↔city links
-- 24 monthly climate-normal rows (12 × 2 cities, NOAA 1991–2020 approximated)
+- 2 public cities (Seattle, San Francisco placeholder); any number of
+  local sibling/grid entries via gitignored `data/cities.local.yaml`.
+- 38 concepts, 8 shared between Seattle and San Francisco.
+- 45 occurrences (31 Seattle + 14 San Francisco); local children
+  inherit their parent's via `parent_slug`.
+- 32 overlap pairs.
+- 15 precipitation types (10 universal intensities + 5 patterns).
+- 7 pattern↔city links.
+- 24 monthly climate-normal rows (12 × 2 cities, NOAA 1991–2020 approximated);
+  local children inherit their parent's.
 - Observations and classifications stream in from Open-Meteo via
   `scripts/fetch_weather.py` — no API key needed.
 
@@ -389,8 +421,11 @@ on overlap pairs whose concepts have no occurrence in that city.
 - Add a non-West-Coast city (NYC / Boston / Chicago) to stress-test the
   model with hurricanes, polar vortex, real winter, and humid summers.
 - Move first-sun thresholds + signal-gate parameters out of `classify.py`
-  and into per-city YAML.
+  and into per-city YAML (mirror the `narrative:` pattern Seattle now uses).
+- Per-grid climate-normal overrides for sibling cities — children
+  currently inherit the parent's official-airport normals, which can be
+  several degrees off in micro-climates.
 - Small Node/pnpm frontend (framework TBD) over the SQLite DB. Now that
   `observations` + `v_microseason_last_seen` are populated, a calendar
   view + sequence timeline is straightforward.
-- Cron / scheduled job to call `fetch_weather.py --all --days 2` daily.
+- Cron / scheduled job to call `fetch_weather.py --all --days 2 --skip-existing` daily.

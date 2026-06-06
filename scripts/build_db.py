@@ -27,6 +27,9 @@ DB_DIR = ROOT / "db"
 DB_PATH = DB_DIR / "microseasons.db"
 SCHEMA_PATH = DB_DIR / "schema.sql"
 
+CITIES_YAML = DATA / "cities.yaml"
+CITIES_LOCAL_YAML = DATA / "cities.local.yaml"   # gitignored, optional
+
 
 def slugify(value: str) -> str:
     s = value.lower()
@@ -62,9 +65,39 @@ def init_db() -> sqlite3.Connection:
     return conn
 
 
-def insert_cities(conn: sqlite3.Connection) -> dict[str, int]:
-    rows = load_yaml(DATA / "cities.yaml") or []
+def _load_city_specs() -> tuple[list[dict], int]:
+    """Tracked cities.yaml + optional gitignored cities.local.yaml.
+
+    Local entries are appended after public ones; duplicate slugs raise.
+    Neighborhood / grid-cell / per-ZIP entries belong in the local file
+    so they never get committed (see data/cities.local.example.yaml).
+    Returns (entries, n_local).
+    """
+    public = load_yaml(CITIES_YAML) or []
+    if not CITIES_LOCAL_YAML.exists():
+        return public, 0
+    local = load_yaml(CITIES_LOCAL_YAML) or []
+    seen = {c["slug"]: "cities.yaml" for c in public}
+    for c in local:
+        if c["slug"] in seen:
+            raise ValueError(
+                f"city {c['slug']!r} declared in both {seen[c['slug']]} and "
+                f"cities.local.yaml — pick one"
+            )
+        seen[c["slug"]] = "cities.local.yaml"
+    return public + local, len(local)
+
+
+def insert_cities(conn: sqlite3.Connection) -> tuple[dict[str, int], dict[str, str], int]:
+    """Insert cities; return (slug→id, child_slug→parent_slug, n_local).
+
+    Two passes: first INSERT every city with parent_city_id NULL, then UPDATE
+    children to point at their parent. This avoids ordering constraints in
+    cities.yaml and lets cities.local.yaml children reference tracked parents.
+    """
+    rows, n_local = _load_city_specs()
     ids: dict[str, int] = {}
+    children: dict[str, str] = {}
     for c in rows:
         cur = conn.execute(
             "INSERT INTO cities (slug, name, latitude, longitude, notes) "
@@ -78,7 +111,22 @@ def insert_cities(conn: sqlite3.Connection) -> dict[str, int]:
             },
         )
         ids[c["slug"]] = cur.lastrowid
-    return ids
+        if c.get("parent_slug"):
+            children[c["slug"]] = c["parent_slug"]
+
+    for child_slug, parent_slug in children.items():
+        if parent_slug not in ids:
+            raise ValueError(
+                f"city {child_slug!r} declares parent_slug={parent_slug!r} "
+                f"which isn't in data/cities.yaml"
+            )
+        if parent_slug == child_slug:
+            raise ValueError(f"city {child_slug!r} can't be its own parent")
+        conn.execute(
+            "UPDATE cities SET parent_city_id = ? WHERE id = ?",
+            [ids[parent_slug], ids[child_slug]],
+        )
+    return ids, children, n_local
 
 
 def insert_series(conn: sqlite3.Connection) -> dict[str, int]:
@@ -231,10 +279,16 @@ def insert_climate_normals(
 def insert_city_files(
     conn: sqlite3.Connection,
     city_ids: dict[str, int],
+    children: dict[str, str],
     concept_ids: dict[str, int],
     precip_ids: dict[str, int],
 ) -> tuple[int, int, int, int]:
-    """Process every YAML under data/cities/. Returns (n_occurrences, n_overlaps, n_pattern_links, n_normals_months)."""
+    """Process every YAML under data/cities/. Returns (n_occurrences, n_overlaps, n_pattern_links, n_normals_months).
+
+    Child cities (those with parent_slug set in cities.yaml) MAY have their
+    own YAML for per-grid normal overrides etc.; if absent, they silently
+    inherit everything from the parent via the catalog views.
+    """
     n_occ = n_overlap = n_pat = n_normals = 0
     if not CITIES_DIR.exists():
         return 0, 0, 0, 0
@@ -246,6 +300,12 @@ def insert_city_files(
         city_slug = doc["city"]
         if city_slug not in city_ids:
             raise ValueError(f"{path.name}: unknown city {city_slug!r} (add it to data/cities.yaml)")
+        if city_slug in children and (doc.get("occurrences") or doc.get("overlaps")):
+            raise ValueError(
+                f"{path.name}: child city {city_slug!r} (parent_slug={children[city_slug]!r}) "
+                f"cannot define its own occurrences/overlaps — those are inherited "
+                f"from the parent. Per-grid climate-normal overrides are allowed."
+            )
         city_id = city_ids[city_slug]
 
         # ---- climate normals ----
@@ -347,35 +407,42 @@ def insert_city_files(
 def main() -> int:
     conn = init_db()
     try:
-        city_ids = insert_cities(conn)
+        city_ids, children, n_local = insert_cities(conn)
         series_ids = insert_series(conn)
         concept_ids = insert_microseason_concepts(conn, series_ids)
         precip_ids = insert_precipitation(conn)
         n_occ, n_overlap, n_pat, n_normals = insert_city_files(
-            conn, city_ids, concept_ids, precip_ids
+            conn, city_ids, children, concept_ids, precip_ids
         )
         conn.commit()
 
-        # Per-city summary
+        # Per-city summary, counted through the catalog view so children show
+        # the inherited count (and we can label the inheritance).
         per_city = conn.execute(
             """
-            SELECT c.slug, COUNT(o.id)
+            SELECT c.slug,
+                   c.parent_city_id IS NOT NULL                       AS is_child,
+                   (SELECT slug FROM cities WHERE id = c.parent_city_id) AS parent_slug,
+                   (SELECT COUNT(*) FROM microseason_occurrences o
+                     WHERE o.city_id = COALESCE(c.parent_city_id, c.id)) AS n_occ
             FROM cities c
-            LEFT JOIN microseason_occurrences o ON o.city_id = c.id
-            GROUP BY c.id ORDER BY c.slug
+            ORDER BY c.slug
             """
         ).fetchall()
     finally:
         conn.close()
 
     print(f"Built {DB_PATH.relative_to(ROOT)}")
-    print(f"  cities:                  {len(city_ids)}")
+    local_note = f", {n_local} from cities.local.yaml" if n_local else ""
+    print(f"  cities:                  {len(city_ids)}  "
+          f"({len(children)} child / grid{local_note})")
     print(f"  series:                  {len(series_ids)}")
     print(f"  microseason concepts:    {len(concept_ids)}")
     print(f"  precipitation types:     {len(precip_ids)}")
     print(f"  occurrences (per city):")
-    for slug, n in per_city:
-        print(f"    - {slug:<20} {n}")
+    for slug, is_child, parent_slug, n in per_city:
+        suffix = f"  (inherits from {parent_slug})" if is_child else ""
+        print(f"    - {slug:<20} {n}{suffix}")
     print(f"  overlaps:                {n_overlap}")
     print(f"  pattern <-> city links:  {n_pat}")
     print(f"  climate-normal months:   {n_normals}")

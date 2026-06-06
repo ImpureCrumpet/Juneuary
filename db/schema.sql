@@ -19,14 +19,33 @@ PRAGMA foreign_keys = ON;
 -- ---------------------------------------------------------------------------
 -- Cities
 -- ---------------------------------------------------------------------------
+-- A "parent" city owns the microseason catalog (concepts, occurrences,
+-- normals, overlaps) for itself AND for any child "grid" cities that
+-- reference it via parent_city_id. Child cities have their own lat/lng
+-- (different Open-Meteo grid cell, so their observations are independent)
+-- but inherit the catalog wholesale: same microseason vocabulary,
+-- different weather signal per grid cell.
 CREATE TABLE IF NOT EXISTS cities (
     id              INTEGER PRIMARY KEY,
     slug            TEXT NOT NULL UNIQUE,   -- 'seattle', 'san_francisco'
     name            TEXT NOT NULL,
     latitude        REAL,
     longitude       REAL,
+    parent_city_id  INTEGER REFERENCES cities(id),  -- NULL for catalog-owning cities
     notes           TEXT
 );
+
+-- catalog_city_id = parent if set, else self. Used by the views below so a
+-- query for a child city returns the parent's occurrences and normals.
+DROP VIEW IF EXISTS v_catalog_city;
+CREATE VIEW v_catalog_city AS
+SELECT
+    c.id                                AS city_id,
+    c.slug                              AS city_slug,
+    c.name                              AS city_name,
+    c.latitude, c.longitude,
+    COALESCE(c.parent_city_id, c.id)    AS catalog_city_id
+FROM cities c;
 
 -- ---------------------------------------------------------------------------
 -- Series (global): winter/spring/summer/fall/first_sun/low_sun/...
@@ -295,12 +314,16 @@ CREATE TABLE IF NOT EXISTS city_climate_normals (
 -- A microseason's defining anomaly is computed against its start month.
 -- Multi-month microseasons sit on a continuum; consumers can join to other
 -- months from city_climate_normals directly if they need a span average.
+--
+-- Catalog-aware: each city_slug yields its catalog city's occurrences and
+-- normals (parent if set, else self). Child cities see the parent's
+-- catalog without duplicating any rows.
 -- ---------------------------------------------------------------------------
 DROP VIEW IF EXISTS v_occurrence_vs_normals;
 CREATE VIEW v_occurrence_vs_normals AS
 SELECT
-    c.slug                                              AS city_slug,
-    c.name                                              AS city_name,
+    vc.city_slug                                        AS city_slug,
+    vc.city_name                                        AS city_name,
     COALESCE(o.local_name, m.canonical_name)            AS display_name,
     m.canonical_name                                    AS canonical_name,
     m.category                                          AS category,
@@ -316,11 +339,11 @@ SELECT
          THEN o.temp_min_f - n.temp_min_avg_f END       AS low_anomaly_f,
     o.id                                                AS occurrence_id,
     m.id                                                AS microseason_id
-FROM microseason_occurrences o
-JOIN microseasons m ON m.id = o.microseason_id
-JOIN cities       c ON c.id = o.city_id
+FROM v_catalog_city vc
+JOIN microseason_occurrences o ON o.city_id = vc.catalog_city_id
+JOIN microseasons m            ON m.id = o.microseason_id
 LEFT JOIN city_climate_normals n
-  ON n.city_id = o.city_id AND n.month = o.typical_start_month;
+  ON n.city_id = vc.catalog_city_id AND n.month = o.typical_start_month;
 
 -- ---------------------------------------------------------------------------
 -- Indexes
@@ -333,12 +356,16 @@ CREATE INDEX IF NOT EXISTS idx_microseasons_series ON microseasons(series_id, se
 
 -- ---------------------------------------------------------------------------
 -- Convenience view: a flat "as-if-pre-refactor" listing per city.
+--
+-- Catalog-aware via v_catalog_city: each city_slug returns its catalog
+-- city's occurrences (parent if set, else self). Child cities return
+-- the parent's rows without storing duplicates.
 -- ---------------------------------------------------------------------------
 DROP VIEW IF EXISTS v_city_microseasons;
 CREATE VIEW v_city_microseasons AS
 SELECT
-    c.slug                                            AS city_slug,
-    c.name                                            AS city_name,
+    vc.city_slug                                      AS city_slug,
+    vc.city_name                                      AS city_name,
     m.id                                              AS microseason_id,
     o.id                                              AS occurrence_id,
     COALESCE(o.local_name, m.canonical_name)          AS display_name,
@@ -358,7 +385,7 @@ SELECT
     m.description                                     AS concept_description,
     o.local_description                               AS local_description,
     o.notes                                           AS occurrence_notes
-FROM microseason_occurrences o
-JOIN microseasons m ON m.id = o.microseason_id
-JOIN cities       c ON c.id = o.city_id
-LEFT JOIN series  s ON s.id = m.series_id;
+FROM v_catalog_city vc
+JOIN microseason_occurrences o ON o.city_id = vc.catalog_city_id
+JOIN microseasons m            ON m.id = o.microseason_id
+LEFT JOIN series  s            ON s.id = m.series_id;

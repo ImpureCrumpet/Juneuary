@@ -1,0 +1,23 @@
+# Local-only city overlay. Copy to `data/cities.local.yaml` (gitignored)
+# and add neighborhood-level entries here. Reasons to keep them local:
+#
+#   - ZIPs / grid cells / blocks identify where the user actually lives.
+#   - Each entry pins an Open-Meteo grid cell to a name; that pairing
+#     should be a personal preference, not a public record.
+#   - The sibling/child mechanism (parent_slug) means a local entry can
+#     inherit the canonical city's catalog + climate normals with zero
+#     duplication, so the public repo never needs the neighborhood at all.
+#
+# `scripts/build_db.py` loads this file after `data/cities.yaml` if it
+# exists; entries are upserted by slug. Parent cities referenced via
+# `parent_slug` MUST exist in the tracked `data/cities.yaml`.
+#
+# Example: add a neighborhood / grid-cell child of `seattle`.
+#
+# - slug: seattle_neighborhood
+#   name: "Seattle, WA (neighborhood)"
+#   latitude: 47.6XXX
+#   longitude: -122.3XXX
+#   parent_slug: seattle    # inherits Seattle's catalog + climate normals + narrative
+#   notes: >
+#     Optional free-text. Anything here stays on this machine.

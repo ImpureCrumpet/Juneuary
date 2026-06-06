@@ -137,10 +137,16 @@ def classify_observation(conn: sqlite3.Connection, inp: ObservationIn) -> Classi
     if not city_row:
         raise ValueError(f"unknown city: {inp.city_slug}")
 
-    # ---- anomalies vs climate normals ----
+    # ---- anomalies vs climate normals (catalog-aware: child cities inherit
+    #      the parent's normals via v_catalog_city) ----
     n = conn.execute(
-        "SELECT * FROM city_climate_normals WHERE city_id = ? AND month = ?",
-        [city_row["id"], inp.month],
+        """
+        SELECT n.*
+        FROM city_climate_normals n
+        JOIN v_catalog_city vc ON vc.catalog_city_id = n.city_id
+        WHERE vc.city_slug = ? AND n.month = ?
+        """,
+        [inp.city_slug, inp.month],
     ).fetchone()
     if n:
         result.anomaly.normal_high_f = n["temp_max_avg_f"]
