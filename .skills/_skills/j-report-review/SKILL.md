@@ -81,11 +81,10 @@ report's "Monthly Summary vs Normals" — allow ±1°F display rounding.
 
 | Check | Issue if wrong |
 |-------|----------------|
-| Snapshot "100% classified" | Misleading — secondary-only days count |
-| Primary timeline day sums | Overlap — won't equal calendar days |
+| YTD Summary primary % | Counts days with any primary; overlaps normal |
+| Season timeline vs triggered | Snow weeks — Find Bananas / Paralyzing Snow live in **Triggered events** table |
 | Missing primary days | Warm outliers (May 80°F+) may be unclassified |
-| Partial month normals | June 5 days vs full-month precip normal |
-| `humanize_date` `%-d` | Unix-only; breaks on Windows |
+| Partial month normals | YTD in June — monthly story flags short months |
 | Stale DB | Forecast-era temps off by several °F |
 
 ### 7. Cross-check narrative claims

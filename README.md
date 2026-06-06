@@ -34,7 +34,7 @@ scripts/
   fetch_weather.py            Open-Meteo client: fetch + classify + persist
   classify.py                 shared classifier (primary/secondary/triggered)
   solar.py                    solar geometry (declination + max elevation)
-  report.py                   YTD tabular markdown report from DB
+  report.py                   combined YTD markdown report from DB
 .skills/                      agent skills (harness + j-* project skills)
 .skills-harness/              vendored skills-harness kit (git subtree)
 ```
@@ -46,11 +46,12 @@ Vendored from [Gargoyle-Apps/skills-harness](https://github.com/Gargoyle-Apps/sk
 | Skill | Purpose |
 |-------|---------|
 | `j-weather-sync` | Fetch Open-Meteo → SQLite, re-classify |
-| `j-ytd-report` | Tabular YTD markdown report |
-| `j-narrative-report` | Human narrative + season timeline |
+| `j-ytd-report` | Combined YTD report (summary, timeline, tables) |
 | `j-report-review` | Verify reports against live Open-Meteo |
 
 Update the kit: `git subtree pull --prefix=.skills-harness skills-harness main --squash` (see **harness-subtree** skill).
+
+Reports are written to `reports/` (gitignored except `.gitkeep`). Use `seattle` for city-center coords or `seattle_neighborhood` for ZIP NNNNN (NEIGHBORHOOD).
 
 ## Quick start
 

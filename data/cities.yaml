@@ -10,6 +10,15 @@
     Puget Sound Convergence Zone, Olympic rain shadow, and an annual smoke
     season courtesy of the rest of the West Coast burning down.
 
+- slug: seattle_neighborhood
+  name: "Seattle, WA (NNNNN)"
+  latitude: 47.NNNN
+  longitude: -122.NNNN
+  notes: >
+    NEIGHBORHOOD / NEIGHBORHOOD / NEIGHBORHOOD (ZIP NNNNN). Same microseason
+    catalog as city-center Seattle; weather from Open-Meteo grid cell near
+    47.NN°N, -122.NN°W (convergence-zone north end).
+
 - slug: san_francisco
   name: "San Francisco, CA"
   latitude: 37.7749

@@ -1,63 +1,81 @@
 ---
 name: j-ytd-report
-description: "Generate the machine-readable YTD microseasons markdown report from the local DB."
+description: "Generate the combined YTD microseasons report — summary, numbers, monthly story, and season timeline."
 triggers:
   - ytd report
-  - tabular report
   - generate report
   - microseason report
-  - seattle report tables
+  - narrative report
+  - season timeline
+  - write up the year
+  - seattle report
 dependencies:
   - j-weather-sync
-version: "1.0.0"
+  - j-report-review
+version: "2.0.0"
 ---
 
-# YTD Tabular Report
+# YTD Report (combined)
 
 ## When to use this skill
 
-Load when the user wants the **machine-readable** year-to-date report: snapshot
-counts, primary/secondary timelines, series progression, triggered events,
-monthly normals table, and notable days. This report reads **only the local DB**
-— run **j-weather-sync** first (and **j-report-review** if accuracy matters).
+Load when the user wants a **single** year-to-date microseasons report: narrative
+summary up front, stats table, monthly story, biweekly season timeline with
+commentary, series progression, triggered events, and notable days.
 
-## Instructions
+There is no separate tabular vs narrative output — one file covers both.
 
-### 1. Ensure observations exist
+## Prerequisites
+
+1. **j-weather-sync** — observations in `db/microseasons.db` for the city and period.
+2. **j-report-review** — verify DB matches live Open-Meteo (especially forecast-era dates).
 
 ```bash
-uv run scripts/fetch_weather.py --city seattle --start 2026-01-01 --end <today> --skip-existing
+uv sync
+uv run scripts/build_db.py   # if DB missing
 ```
 
-### 2. Generate
+## Generate
 
 ```bash
 uv run scripts/report.py --city seattle
+uv run scripts/report.py --city seattle_neighborhood --year 2019
 uv run scripts/report.py --city seattle --through 2026-06-05
 uv run scripts/report.py --city seattle --out reports/custom.md
 ```
 
-Default output: `reports/<city>_<year>_ytd.md`.
+Default output: `reports/<city>_<year>_ytd.md` (gitignored except `reports/.gitkeep`).
 
-### 3. Understand the output sections
+## Report structure (in order)
 
-| Section | Source |
-|---------|--------|
-| Snapshot | observation + classification counts |
-| Primary / Secondary timelines | per-microseason day counts (overlapping) |
-| Series progression | winter/spring/summer/fall slot chronology |
-| Triggered events | signal-fired events with reasons |
-| Aberrations | `is_aberration` flag from classifier |
-| Monthly summary vs normals | `city_climate_normals` |
-| Notable days | top-5 hot/cold/wet from observations |
+| Section | Content |
+|---------|---------|
+| **YTD Summary** | Auto headline, classification stats, spring-series arc |
+| **The numbers** | YTD precip/snow/freeze/heat table vs normals |
+| **Monthly story** | One bullet per month with narrative tags (wet, snow, mild, etc.) |
+| **Season timeline** | ~Biweekly chapters: weather, dominant series, triggered events, lived-experience note |
+| **Series progression** | Winter → spring → summer → fall slot chronology |
+| **Triggered events** | Full table (Find Bananas, Paralyzing Snow, Photon Fraud, …) |
+| **Notable days** | Top-5 hot / cold / wet |
+| **Method** | Data sources and caveats |
 
-### 4. Interpretation caveats (tell the user if relevant)
+## Cities
 
-- **Primary day counts overlap** — a single day can carry Winter + The Dark Wet + Fool's Spring. Counts do not sum to calendar days.
-- **"Days with a classification: 100%"** means every day has at least a secondary constant (e.g. Convergence Zones), not that every day has a primary microseason.
-- **~10–15% of days may lack any primary** when temps fall outside all defined profiles or match only out-of-window concepts.
+| Slug | Location |
+|------|----------|
+| `seattle` | City center (47.61°N, -122.33°W) |
+| `seattle_neighborhood` | NEIGHBORHOOD / ZIP NNNNN (47.NN°N, -122.NN°W) |
+
+Add more in `data/cities.yaml` + `data/cities/<slug>.yaml`, then `build_db.py`.
+
+## Interpretation notes (include when relevant)
+
+- Primary microseason counts **overlap** — multiple primaries per day is normal.
+- "Days with a primary" may be &lt;100% — warm outliers can be unclassified.
+- **Find Bananas / Paralyzing Snow** appear under **Triggered events**, not the season timeline title — check that section for snow weeks.
+- Partial months (YTD in June) — precip vs full-month normal is apples/oranges.
 
 ## Examples
 
-- "Generate the Seattle YTD tables" → `report.py --city seattle`
-- "Report through June 5" → `--through 2026-06-05`
+- "Report for Seattle 2019 in NNNNN" → sync 2019, verify OM, `report.py --city seattle_neighborhood --year 2019`
+- "Write up the year's false springs" → same report; read Monthly story + Season timeline

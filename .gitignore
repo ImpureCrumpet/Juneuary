@@ -26,10 +26,9 @@ build/
 .vscode/
 .idea/
 
-# Generated reports (commit reference + narrative examples)
-reports/*.md
-!reports/seattle_2026_ytd.md
-!reports/seattle_2026_ytd_narrative.md
+# Generated reports (local output only; keep the folder)
+reports/*
+!reports/.gitkeep
 
 # Skills harness — native IDE discovery symlinks (machine-local)
 .agents/skills/
