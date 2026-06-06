@@ -95,6 +95,9 @@ def _day_state_from_classify(
                 confidence=m.confidence,
                 reason=m.reason,
                 emoji=p.emoji, color=p.color, glyph=p.glyph,
+                series_key=m.series_key,
+                series_order=m.series_order,
+                series_label=m.series_label,
             ))
     return ds
 

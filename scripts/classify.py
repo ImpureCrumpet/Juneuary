@@ -101,6 +101,8 @@ class Match:
     tier: str                                 # 'primary' | 'secondary' | 'triggered'
     confidence: float
     reason: str
+    series_key: str | None = None             # 'winter' | 'spring' | ...
+    series_order: int | None = None
 
 
 @dataclass
@@ -261,6 +263,7 @@ def classify_observation(conn: sqlite3.Connection, inp: ObservationIn) -> Classi
 # ---------------------------------------------------------------------------
 
 def _build_match(r: sqlite3.Row, tier: str, confidence: float, reason: str) -> Match:
+    keys = r.keys()
     return Match(
         occurrence_id=r["occurrence_id"],
         microseason_id=r["microseason_id"],
@@ -271,6 +274,8 @@ def _build_match(r: sqlite3.Row, tier: str, confidence: float, reason: str) -> M
         tier=tier,
         confidence=confidence,
         reason=reason,
+        series_key=r["series_key"] if "series_key" in keys else None,
+        series_order=r["series_order"] if "series_order" in keys else None,
     )
 
 

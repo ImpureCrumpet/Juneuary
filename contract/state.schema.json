@@ -63,7 +63,10 @@
         "reason": { "type": "string" },
         "emoji": { "type": "string", "description": "May be empty for concepts without a glyph." },
         "color": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$", "description": "Hex RGB for LED/web." },
-        "glyph": { "type": "string", "description": "Sprite key the display maps to its own icon set." }
+        "glyph": { "type": "string", "description": "Sprite key the display maps to its own icon set." },
+        "series_key": { "type": ["string", "null"], "description": "Series this concept belongs to (winter/spring/summer/fall/...), if any." },
+        "series_order": { "type": ["integer", "null"] },
+        "series_label": { "type": ["string", "null"], "description": "e.g. 'spring1', 'winter2'." }
       }
     },
     "dayState": {
