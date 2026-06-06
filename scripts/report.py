@@ -1,26 +1,37 @@
 """Generate a combined YTD microseasons report for a city.
 
-Pulls from the local SQLite DB (0 API calls). All prose lives in each city's
-YAML at `data/cities/<catalog_slug>.yaml#narrative`; this script computes
-features (snow_label, peak_*, avg_hi, etc.) and renders them through the
-city's templates. Voice is data; dispatch + features are code.
+The report is a pure CONSUMER of Juneuary's HTTP API: it fetches a classified
+date range (`/v1/days`) and climate normals (`/v1/normals`) and renders them
+through the city's narrative templates. It never touches the DB or Open-Meteo
+directly — the API does the fetching/classifying — which makes this script an
+end-to-end test that the contract is rich enough to rebuild the full report.
 
-Run `scripts/fetch_weather.py` first to populate observations.
+By default it boots the API in-process against the local catalog DB; point it
+at a running server with `--api-url`. Prose lives in
+`data/cities/<catalog_slug>.narrative.yaml`; this script computes features
+(snow_label, peak_*, avg_hi, ...) and renders them. Voice is data; dispatch +
+features are code.
 
 Example:
-    uv run scripts/report.py --city seattle
     uv run scripts/report.py --city seattle --year 2019
+    uv run scripts/report.py --city seattle --api-url http://localhost:8787
 """
 
 from __future__ import annotations
 
 import argparse
+import contextlib
+import json
 import re
 import sqlite3
 import sys
+import threading
+import urllib.parse
+import urllib.request
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
+from http.server import ThreadingHTTPServer
 from pathlib import Path
 
 import yaml
@@ -31,6 +42,7 @@ CITIES_YAML_DIR = ROOT / "data" / "cities"
 
 sys.path.insert(0, str(ROOT / "src"))
 from juneuary.presentation import emoji_map    # noqa: E402
+from juneuary.serve import make_handler         # noqa: E402
 
 TOP_N = 5
 BIWEEKLY_DAYS = 14
@@ -131,95 +143,93 @@ def section_heading(title: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# DB access
+# API client — the report consumes Juneuary's HTTP API, never the DB directly.
+# The downstream renderers expect dict rows keyed exactly like the old SQL
+# results, so the adapters below reshape the JSON payloads into those rows.
 # ---------------------------------------------------------------------------
 
-def open_db(path: Path) -> sqlite3.Connection:
-    conn = sqlite3.connect(path)
-    conn.row_factory = sqlite3.Row
-    return conn
+def _api_get(base: str, path: str) -> dict:
+    url = base.rstrip("/") + path
+    with urllib.request.urlopen(url, timeout=180) as resp:   # noqa: S310 (localhost)
+        return json.loads(resp.read().decode("utf-8"))
 
 
-def get_city(conn: sqlite3.Connection, slug: str) -> sqlite3.Row:
-    row = conn.execute("SELECT * FROM cities WHERE slug = ?", [slug]).fetchone()
-    if row is None:
-        raise SystemExit(f"city not found: {slug}")
-    return row
+def fetch_days(base: str, city: str, start: str, end: str) -> dict:
+    q = urllib.parse.urlencode({"city": city, "start": start, "end": end})
+    return _api_get(base, f"/v1/days?{q}")
 
 
-def get_catalog_slug(conn: sqlite3.Connection, slug: str) -> str:
-    """Resolve to parent slug if this is a child city, else self."""
-    row = conn.execute(
-        """
-        SELECT COALESCE(
-            (SELECT c2.slug FROM cities c2 WHERE c2.id = c1.parent_city_id),
-            c1.slug
-        ) AS catalog_slug
-        FROM cities c1 WHERE c1.slug = ?
-        """,
-        [slug],
-    ).fetchone()
-    return row["catalog_slug"] if row else slug
+def fetch_normals(base: str, city: str) -> dict:
+    q = urllib.parse.urlencode({"city": city})
+    return _api_get(base, f"/v1/normals?{q}")
 
 
-def get_observations(
-    conn: sqlite3.Connection, city_id: int, start: str, end: str
-) -> list[sqlite3.Row]:
-    return conn.execute(
-        """
-        SELECT id, observed_date, temp_high_f, temp_low_f, temp_mean_f,
-               precip_in, snow_in, cloud_cover_mean_pct, sun_hours,
-               smoke, pm25_ug_m3, aqi_us, solar_elevation_max_deg,
-               is_aberration, aberration_reason
-        FROM observations
-        WHERE city_id = ? AND observed_date BETWEEN ? AND ?
-        ORDER BY observed_date
-        """,
-        [city_id, start, end],
-    ).fetchall()
+def observations_from_days(payload: dict) -> list[dict]:
+    """One observation-row per day. Fields the API doesn't carry (mean temp,
+    cloud, sun, air quality) are None; renderers degrade gracefully."""
+    rows = []
+    for day in payload.get("days", []):
+        rows.append({
+            "observed_date": day["date"],
+            "temp_high_f": day.get("temp_high_f"),
+            "temp_low_f": day.get("temp_low_f"),
+            "temp_mean_f": None,
+            "precip_in": day.get("precip_in"),
+            "snow_in": day.get("snow_in"),
+            "cloud_cover_mean_pct": None,
+            "sun_hours": None,
+            "smoke": None,
+            "pm25_ug_m3": None,
+            "aqi_us": None,
+            "solar_elevation_max_deg": None,
+            "is_aberration": day.get("is_aberration", False),
+            "aberration_reason": day.get("aberration_reason", ""),
+        })
+    return rows
 
 
-def get_classifications(
-    conn: sqlite3.Connection, city_id: int, start: str, end: str
-) -> list[sqlite3.Row]:
-    return conn.execute(
-        """
-        SELECT o.observed_date         AS d,
-               om.tier                 AS tier,
-               om.confidence           AS confidence,
-               om.reason               AS reason,
-               COALESCE(occ.local_name, m.canonical_name) AS display_name,
-               m.canonical_name        AS canonical_name,
-               m.category              AS category,
-               s.key                   AS series_key,
-               m.series_order          AS series_order,
-               m.series_label          AS series_label,
-               o.is_aberration         AS is_aberration
-        FROM observation_microseasons om
-        JOIN observations o            ON o.id   = om.observation_id
-        JOIN microseason_occurrences occ ON occ.id = om.occurrence_id
-        JOIN microseasons m            ON m.id   = occ.microseason_id
-        LEFT JOIN series s             ON s.id   = m.series_id
-        WHERE o.city_id = ? AND o.observed_date BETWEEN ? AND ?
-        ORDER BY o.observed_date, om.tier, m.canonical_name
-        """,
-        [city_id, start, end],
-    ).fetchall()
+def classifications_from_days(payload: dict) -> list[dict]:
+    """Flatten each day's primary/secondary/triggered views into the
+    classification rows the renderers consume."""
+    rows = []
+    for day in payload.get("days", []):
+        for tier in ("primary", "secondary", "triggered"):
+            for v in day.get(tier, []):
+                rows.append({
+                    "d": day["date"],
+                    "tier": v["tier"],
+                    "confidence": v["confidence"],
+                    "reason": v["reason"],
+                    "display_name": v["display_name"],
+                    "canonical_name": v["canonical_name"],
+                    "category": v["category"],
+                    "series_key": v.get("series_key"),
+                    "series_order": v.get("series_order"),
+                    "series_label": v.get("series_label"),
+                    "is_aberration": day.get("is_aberration", False),
+                })
+    return rows
 
 
-def get_normals(conn: sqlite3.Connection, city_slug: str) -> dict[int, sqlite3.Row]:
-    """Climate normals for the city, resolved through v_catalog_city so
-    child cities transparently inherit their parent's normals."""
-    rows = conn.execute(
-        """
-        SELECT n.*
-        FROM city_climate_normals n
-        JOIN v_catalog_city vc ON vc.catalog_city_id = n.city_id
-        WHERE vc.city_slug = ?
-        """,
-        [city_slug],
-    ).fetchall()
-    return {r["month"]: r for r in rows}
+def normals_from_payload(payload: dict) -> dict[int, dict]:
+    """{month:int -> normals row}, mirroring the old get_normals shape."""
+    return {int(month): {"month": int(month), **vals}
+            for month, vals in (payload.get("normals") or {}).items()}
+
+
+@contextlib.contextmanager
+def ephemeral_api(db_path: str):
+    """Boot the JSON API in-process on an ephemeral port for the duration of a
+    report run, so the report dogfoods the real HTTP contract."""
+    httpd = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(db_path))
+    thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+    thread.start()
+    host, port = httpd.server_address
+    try:
+        yield f"http://{host}:{port}"
+    finally:
+        httpd.shutdown()
+        httpd.server_close()
 
 
 # ---------------------------------------------------------------------------
@@ -241,7 +251,7 @@ class Narrative:
 
 
 def load_narrative(catalog_slug: str) -> Narrative:
-    path = CITIES_YAML_DIR / f"{catalog_slug}.yaml"
+    path = CITIES_YAML_DIR / f"{catalog_slug}.narrative.yaml"
     if not path.exists():
         return Narrative()
     doc = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
@@ -1073,16 +1083,18 @@ def render_notable_days(observations: list[sqlite3.Row]) -> str:
 def render_method_notes(total_days: int) -> str:
     return (
         f"{section_heading('Method')}\n\n"
-        "- Report reads cached observations from `db/microseasons.db` (0 API calls).\n"
-        f"- Backfilling {total_days} days costs **2–4 Open-Meteo calls per city** "
+        "- Report is a pure consumer of the Juneuary API: it pulls a classified "
+        "range from `/v1/days` and climate normals from `/v1/normals` — the API "
+        "fetches Open-Meteo and classifies; this script only renders.\n"
+        f"- Building {total_days} days costs **2–4 Open-Meteo calls per city** "
         "(weather + air-quality, doubled when the range straddles the ~7-day "
-        "archive/forecast seam in `fetch_weather.py`). Re-fetch recent weeks before "
-        "publishing — forecast-era rows drift.\n"
+        "archive/forecast seam in `fetch_weather.py`). Forecast-era days drift — "
+        "rebuild before publishing.\n"
         "- Verify against live Open-Meteo before trusting degree-level values "
         "(see **j-report-review** skill).\n"
         "- ERA5 grid-cell data ≠ your block; north Seattle snow can differ from downtown.\n"
         "- Classification: `scripts/classify.py` (primary / secondary / triggered).\n"
-        "- Narrative voice: `data/cities/<catalog_slug>.yaml#narrative` "
+        "- Narrative voice: `data/cities/<catalog_slug>.narrative.yaml` "
         "(child cities inherit via parent_slug).\n"
     )
 
@@ -1091,45 +1103,32 @@ def render_method_notes(total_days: int) -> str:
 # Main
 # ---------------------------------------------------------------------------
 
-def main() -> int:
-    p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument("--city", required=True,
-                   help="city slug (see data/cities.yaml + data/cities.local.yaml)")
-    p.add_argument("--year", type=int, default=date.today().year)
-    p.add_argument("--from", dest="start", help="override start date (YYYY-MM-DD)")
-    p.add_argument("--through", dest="end", help="override end date (YYYY-MM-DD)")
-    p.add_argument("--out", help="output path (default: reports/<city>_<year>_ytd.md)")
-    p.add_argument("--db", default=str(DB_PATH))
-    args = p.parse_args()
+def build_report(base: str, city_slug: str, start: str, end: str) -> str:
+    """Fetch a classified range + normals from the API and render the report.
 
-    today = date.today()
-    start = args.start or f"{args.year}-01-01"
-    end = args.end or min(today.isoformat(), f"{args.year}-12-31")
-    total_days = (date.fromisoformat(end) - date.fromisoformat(start)).days + 1
+    `base` is an API root like http://127.0.0.1:8787. Returns the markdown body.
+    """
+    days_payload = fetch_days(base, city_slug, start, end)
+    if not days_payload.get("days"):
+        raise SystemExit(
+            f"API {base} returned no days for {city_slug} in [{start}, {end}]."
+        )
+    normals_payload = fetch_normals(base, city_slug)
 
-    out_path = Path(args.out or ROOT / "reports" / f"{args.city}_{args.year}_ytd.md")
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-
-    conn = open_db(Path(args.db))
-    city = get_city(conn, args.city)
-    catalog_slug = get_catalog_slug(conn, args.city)
-    observations = get_observations(conn, city["id"], start, end)
-    classifications = get_classifications(conn, city["id"], start, end)
-    normals = get_normals(conn, city["slug"])
+    location = days_payload["location"]
+    catalog_slug = location.get("catalog_slug") or location["slug"]
     narrative = load_narrative(catalog_slug)
 
-    if not observations:
-        raise SystemExit(
-            f"No observations for {args.city} in [{start}, {end}]. "
-            f"Run: uv run scripts/fetch_weather.py --city {args.city} "
-            f"--start {start} --end {end}"
-        )
+    observations = observations_from_days(days_payload)
+    classifications = classifications_from_days(days_payload)
+    normals = normals_from_payload(normals_payload)
 
+    total_days = (date.fromisoformat(end) - date.fromisoformat(start)).days + 1
     stats = compute_stats(observations, normals, classifications)
     month_ctx = build_month_contexts(observations, classifications)
 
     sections = [
-        render_header(city, start, end, total_days),
+        render_header(location, start, end, total_days),
         render_ytd_summary(stats, classifications, month_ctx, narrative),
         render_the_numbers(stats),
         render_monthly_story(stats, month_ctx, narrative),
@@ -1141,7 +1140,36 @@ def main() -> int:
     ]
     # Single emojify pass on the full document — sub-renderers stay focused
     # on structure; emoji decoration lives here.
-    body = emojify("\n".join(s for s in sections if s).rstrip() + "\n")
+    return emojify("\n".join(s for s in sections if s).rstrip() + "\n")
+
+
+def main() -> int:
+    p = argparse.ArgumentParser(description=__doc__)
+    p.add_argument("--city", required=True,
+                   help="city slug (see data/cities.yaml + data/cities.local.yaml)")
+    p.add_argument("--year", type=int, default=date.today().year)
+    p.add_argument("--from", dest="start", help="override start date (YYYY-MM-DD)")
+    p.add_argument("--through", dest="end", help="override end date (YYYY-MM-DD)")
+    p.add_argument("--out", help="output path (default: reports/<city>_<year>_ytd.md)")
+    p.add_argument("--db", default=str(DB_PATH),
+                   help="catalog DB the in-process API serves (ignored with --api-url)")
+    p.add_argument("--api-url", dest="api_url",
+                   help="use a running API instead of booting one in-process")
+    args = p.parse_args()
+
+    today = date.today()
+    start = args.start or f"{args.year}-01-01"
+    end = args.end or min(today.isoformat(), f"{args.year}-12-31")
+
+    out_path = Path(args.out or ROOT / "reports" / f"{args.city}_{args.year}_ytd.md")
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+
+    if args.api_url:
+        body = build_report(args.api_url, args.city, start, end)
+    else:
+        with ephemeral_api(args.db) as base:
+            body = build_report(base, args.city, start, end)
+
     out_path.write_text(body)
     print(f"Wrote {out_path} ({len(body):,} bytes, {body.count(chr(10))} lines).")
     return 0

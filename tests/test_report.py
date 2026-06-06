@@ -11,8 +11,12 @@ Covers the issues flagged in the recent code review:
 
 from __future__ import annotations
 
+import contextlib
 import sqlite3
-from datetime import date
+import threading
+from datetime import date, datetime, timedelta
+from http.server import ThreadingHTTPServer
+from pathlib import Path
 
 import pytest
 
@@ -20,10 +24,16 @@ from report import (
     Narrative,
     _eval_when,
     build_chunk_features,
+    build_report,
     contiguous_spans,
     emojify,
+    fetch_days,
     render_section,
 )
+from juneuary.serve import make_handler
+
+ROOT = Path(__file__).resolve().parent.parent
+SCHEMA = (ROOT / "db" / "schema.sql").read_text(encoding="utf-8")
 
 
 # ---------------------------------------------------------------------------
@@ -194,3 +204,79 @@ def test_render_section_resolves_ref_clauses():
 def test_render_section_format_substitution():
     spec = {"fragments": [{"template": "high {hi}°F"}]}
     assert render_section(spec, {"hi": 72}, {}) == "high 72°F"
+
+
+# ---------------------------------------------------------------------------
+# End-to-end: the report is a pure API consumer. Boot the real HTTP API with
+# an injected (network-free) fetcher and render through build_report().
+# ---------------------------------------------------------------------------
+
+def _seed_catalog(path: str) -> None:
+    conn = sqlite3.connect(path)
+    conn.executescript(SCHEMA)
+    conn.execute("INSERT INTO cities (id,slug,name,latitude,longitude) "
+                 "VALUES (1,'seattle','Seattle',47.6,-122.3)")
+    # A constant concept classifies as 'secondary' for every day in its window,
+    # giving us deterministic classifications without depending on thresholds.
+    conn.execute("INSERT INTO microseasons (id,canonical_name,slug,category) "
+                 "VALUES (10,'The Grey','the-grey','constant')")
+    conn.execute(
+        "INSERT INTO microseason_occurrences (id,microseason_id,city_id,"
+        "typical_start_month,typical_end_month) VALUES (100,10,1,1,12)"
+    )
+    for month, hi, lo, precip in [(1, 48, 37, 5.5), (2, 50, 38, 3.5), (3, 54, 40, 3.7)]:
+        conn.execute(
+            "INSERT INTO city_climate_normals (city_id,month,temp_max_avg_f,"
+            "temp_min_avg_f,precip_total_in) VALUES (1,?,?,?,?)",
+            [month, hi, lo, precip],
+        )
+    conn.commit()
+    conn.close()
+
+
+def _fake_fetch(lat, lng, start, end):
+    """Deterministic cold-and-wet January-ish weather for [start, end]."""
+    out, d = [], start
+    while d <= end:
+        out.append({
+            "date": d.isoformat(),
+            "temp_high_f": 42.0, "temp_low_f": 34.0,
+            "precip_in": 0.2, "snow_in": 0.0,
+            "cloud_cover_mean_pct": 88,
+        })
+        d += timedelta(days=1)
+    return out
+
+
+@contextlib.contextmanager
+def _api(db_path: str):
+    httpd = ThreadingHTTPServer(
+        ("127.0.0.1", 0), make_handler(db_path, weather_fetcher=_fake_fetch, aq_fetcher=None)
+    )
+    t = threading.Thread(target=httpd.serve_forever, daemon=True)
+    t.start()
+    host, port = httpd.server_address
+    try:
+        yield f"http://{host}:{port}"
+    finally:
+        httpd.shutdown()
+        httpd.server_close()
+
+
+def test_report_consumes_api_end_to_end(tmp_path):
+    db = tmp_path / "catalog.db"
+    _seed_catalog(str(db))
+    with _api(str(db)) as base:
+        # The contract carries the classification: /v1/days ran classify and
+        # surfaced the constant concept as secondary.
+        days = fetch_days(base, "seattle", "2026-01-01", "2026-01-03")
+        assert len(days["days"]) == 3
+        assert "The Grey" in [v["canonical_name"] for v in days["days"][0]["secondary"]]
+        # Full render straight off the API — no DB access in build_report.
+        body = build_report(base, "seattle", "2026-01-01", "2026-01-03")
+
+    assert body.startswith("#")
+    assert "Seattle" in body
+    assert "## " in body
+    assert "°F" in body
+    assert "pure consumer of the Juneuary API" in body
