@@ -1,0 +1,72 @@
+{
+  "schema_version": "1.0",
+  "location": {
+    "slug": "seattle",
+    "name": "Seattle",
+    "latitude": 47.6062,
+    "longitude": -122.3321,
+    "source": "catalog"
+  },
+  "as_of": "2026-02-14",
+  "current": {
+    "date": "2026-02-14",
+    "primary": [
+      {
+        "canonical_name": "Fool's Spring",
+        "display_name": "Fool's Spring",
+        "category": "series",
+        "tier": "primary",
+        "confidence": 0.8,
+        "reason": "high 61F in 58-66F range",
+        "emoji": "🌤️",
+        "color": "#F4C430",
+        "glyph": "sun_cloud"
+      }
+    ],
+    "secondary": [
+      {
+        "canonical_name": "Convergence Zones",
+        "display_name": "Convergence Zones",
+        "category": "constant",
+        "tier": "secondary",
+        "confidence": 1.0,
+        "reason": "background trait active in this window",
+        "emoji": "⚡",
+        "color": "#7D5BA6",
+        "glyph": "bolt"
+      }
+    ],
+    "triggered": [
+      {
+        "canonical_name": "Find Bananas",
+        "display_name": "Find Bananas",
+        "category": "triggered_event",
+        "tier": "triggered",
+        "confidence": 0.95,
+        "reason": "snow in forecast",
+        "emoji": "🍌",
+        "color": "#FFE135",
+        "glyph": "banana"
+      }
+    ],
+    "is_aberration": false,
+    "aberration_reason": "",
+    "is_forecast": false,
+    "temp_high_f": 61.0,
+    "temp_low_f": 44.0,
+    "precip_in": 0.0,
+    "snow_in": 0.0,
+    "headline": {
+      "canonical_name": "Fool's Spring",
+      "display_name": "Fool's Spring",
+      "category": "series",
+      "tier": "primary",
+      "confidence": 0.8,
+      "reason": "high 61F in 58-66F range",
+      "emoji": "🌤️",
+      "color": "#F4C430",
+      "glyph": "sun_cloud"
+    }
+  },
+  "forecast": []
+}

@@ -29,6 +29,9 @@ ROOT = Path(__file__).resolve().parent.parent
 DB_PATH = ROOT / "db" / "microseasons.db"
 CITIES_YAML_DIR = ROOT / "data" / "cities"
 
+sys.path.insert(0, str(ROOT / "src"))
+from juneuary.presentation import emoji_map    # noqa: E402
+
 TOP_N = 5
 BIWEEKLY_DAYS = 14
 
@@ -44,45 +47,21 @@ MONTH_SHORT = [
 # ---------------------------------------------------------------------------
 # Emoji tables
 #
+# Concept emoji live in data/presentation.yaml (the single source of truth
+# shared with the JSON/display layer); MS_EMOJI is loaded from there rather
+# than hand-maintained here.
+#
 # COLLISION POLICY: Several microseasons intentionally share emoji where the
 # vibe overlaps (☀️ Summer/Glorious Sun, 🔥 Hell's Front Porch/Smoketember,
 # 🌧️ The Dark Wet/Welcome Drizzle, 🌫️ Juneuary/Smogust, 🫠 Molding Wet/
 # Oppressive Sun). The collision is intentional — emoji are paired with the
 # bolded name via tag(), so the renderer never has to disambiguate them.
+#
+# TERM_EMOJI / SECTION_EMOJI / STAT_ROW_EMOJI below are report-specific
+# (narrative vernacular + document chrome), not concept metadata, so they
+# stay local to the report.
 # ---------------------------------------------------------------------------
-MS_EMOJI: dict[str, str] = {
-    "Find Bananas": "🍌",
-    "Paralyzing Snow": "🚌",
-    "Winter": "❄️",
-    "Second Winter": "🥶",
-    "Third Winter": "🌨️",
-    "Fool's Spring": "🌤️",
-    "Spring of Deception": "🌸",
-    "The Pollening": "🤧",
-    "Actual Spring": "🌷",
-    "Juneuary": "🌫️",
-    "Summer": "☀️",
-    "Hell's Front Porch": "🔥",
-    "Oppressive Sun": "🫠",
-    "False Fall": "🍂",
-    "Second Summer": "🌅",
-    "Actual Fall": "🍁",
-    "The Grey": "🩶",
-    "The Long Dark": "🌑",
-    "The Dark Wet": "🌧️",
-    "Brightening Wet": "🌦️",
-    "Molding Wet": "🫠",
-    "Flowering Wet": "🌺",
-    "Welcome Drizzle": "🌧️",
-    "Praise the Sun": "🌞",
-    "Glorious Sun": "☀️",
-    "Photon Fraud": "🌥️",
-    "Smogust": "🌫️",
-    "Smoketember": "🔥",
-    "Choking Smoke": "😷",
-    "Convergence Zones": "⚡",
-    "Spider Season": "🕷️",
-}
+MS_EMOJI: dict[str, str] = emoji_map()
 
 TERM_EMOJI: dict[str, str] = {
     "snowmageddon": "🌨️",

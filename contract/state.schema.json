@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://juneuary/contract/state.schema.json",
+  "title": "MicroseasonState",
+  "description": "Render-model contract returned by GET /v1/state and /v1/forecast. Consumed by display clients (web, Starlark/tronbyt). Bump schema_version on any breaking change to this shape.",
+  "type": "object",
+  "required": ["schema_version", "location", "as_of", "current", "forecast"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "description": "Contract version. Clients should refuse/degrade on an unexpected major version.",
+      "examples": ["1.0"]
+    },
+    "location": { "$ref": "#/$defs/location" },
+    "as_of": {
+      "type": "string",
+      "format": "date",
+      "description": "ISO date of the `current` snapshot (the latest observation on file, or the requested date)."
+    },
+    "current": { "$ref": "#/$defs/dayState" },
+    "forecast": {
+      "type": "array",
+      "description": "Forward days, soonest first. Empty for /v1/state; populated for /v1/forecast.",
+      "items": { "$ref": "#/$defs/dayState" }
+    }
+  },
+  "$defs": {
+    "location": {
+      "type": "object",
+      "required": ["slug", "name", "source"],
+      "additionalProperties": false,
+      "properties": {
+        "slug": { "type": "string" },
+        "name": { "type": "string" },
+        "latitude": { "type": ["number", "null"] },
+        "longitude": { "type": ["number", "null"] },
+        "source": {
+          "type": "string",
+          "enum": ["catalog", "zip", "latlng"],
+          "description": "How the location was resolved."
+        },
+        "catalog_slug": {
+          "type": ["string", "null"],
+          "description": "Which curated catalog was borrowed for an arbitrary point (source=latlng/zip). Null for source=catalog."
+        }
+      }
+    },
+    "microseasonView": {
+      "type": "object",
+      "description": "One classified microseason, decorated for display.",
+      "required": ["canonical_name", "display_name", "category", "tier", "confidence", "reason", "emoji", "color", "glyph"],
+      "additionalProperties": false,
+      "properties": {
+        "canonical_name": { "type": "string", "description": "Stable concept key; use for logic." },
+        "display_name": { "type": "string", "description": "City-local name if any; use for display." },
+        "category": {
+          "type": "string",
+          "enum": ["calendar", "series", "triggered_event", "constant", "climate_disaster", "sun_phenomenon"]
+        },
+        "tier": { "type": "string", "enum": ["primary", "secondary", "triggered"] },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "reason": { "type": "string" },
+        "emoji": { "type": "string", "description": "May be empty for concepts without a glyph." },
+        "color": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$", "description": "Hex RGB for LED/web." },
+        "glyph": { "type": "string", "description": "Sprite key the display maps to its own icon set." }
+      }
+    },
+    "dayState": {
+      "type": "object",
+      "required": ["date", "primary", "secondary", "triggered", "is_aberration", "is_forecast"],
+      "additionalProperties": false,
+      "properties": {
+        "date": { "type": "string", "format": "date" },
+        "primary": { "type": "array", "items": { "$ref": "#/$defs/microseasonView" } },
+        "secondary": { "type": "array", "items": { "$ref": "#/$defs/microseasonView" } },
+        "triggered": { "type": "array", "items": { "$ref": "#/$defs/microseasonView" } },
+        "is_aberration": { "type": "boolean" },
+        "aberration_reason": { "type": "string" },
+        "is_forecast": { "type": "boolean" },
+        "temp_high_f": { "type": ["number", "null"] },
+        "temp_low_f": { "type": ["number", "null"] },
+        "precip_in": { "type": ["number", "null"] },
+        "snow_in": { "type": ["number", "null"] },
+        "headline": {
+          "description": "Single dominant microseason for a tiny display: highest-confidence primary, else first triggered, else first secondary, else null. Present on `current`; omitted on forecast days.",
+          "oneOf": [
+            { "$ref": "#/$defs/microseasonView" },
+            { "type": "null" }
+          ]
+        }
+      }
+    }
+  }
+}

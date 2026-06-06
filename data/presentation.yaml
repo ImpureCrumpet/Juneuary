@@ -1,0 +1,84 @@
+# PRESENTATION metadata for microseason CONCEPTS (city-independent).
+#
+# Decouples *what a microseason looks like* from *what it is* (the catalog in
+# microseasons.yaml) and *how it's worded* (per-city narrative YAML). One
+# concept renders the same way everywhere; only timing/thresholds vary by city.
+#
+# Fields per concept:
+#   emoji  - human surfaces (markdown reports, web, chat).
+#   color  - hex RGB for pixel/LED displays (e.g. Tidbyt 64x32) and web accents.
+#   glyph  - short sprite key a display maps to its own icon set. Display-side
+#            concern; keep the vocabulary small and reuse keys across concepts.
+#
+# Source of truth for emoji/color/glyph. report.py and src/juneuary/state.py
+# both read this; the markdown report's emoji values are derived from here.
+# A concept missing from this file renders with no emoji and a neutral color.
+
+schema_version: "1.0"
+
+# Neutral fallback for concepts not listed below.
+default:
+  emoji: ""
+  color: "#9AA3A8"
+  glyph: "dot"
+
+microseasons:
+  # --- Winter series ---
+  "Winter":               { emoji: "❄️", color: "#5BA8D6", glyph: "snowflake" }
+  "Second Winter":        { emoji: "🥶", color: "#4F86C6", glyph: "snowflake" }
+  "Third Winter":         { emoji: "🌨️", color: "#6FA8DC", glyph: "snow" }
+
+  # --- Spring series ---
+  "Fool's Spring":        { emoji: "🌤️", color: "#F4C430", glyph: "sun_cloud" }
+  "Spring of Deception":  { emoji: "🌸", color: "#F7A8C4", glyph: "blossom" }
+  "The Pollening":        { emoji: "🤧", color: "#C9D14A", glyph: "pollen" }
+  "Actual Spring":        { emoji: "🌷", color: "#E86FA0", glyph: "tulip" }
+
+  # --- Summer + heat ---
+  "Juneuary":             { emoji: "🌫️", color: "#9FB6C3", glyph: "fog" }
+  "Summer":               { emoji: "☀️", color: "#FFC400", glyph: "sun" }
+  "Hell's Front Porch":   { emoji: "🔥", color: "#FF4500", glyph: "fire" }
+  "Oppressive Sun":       { emoji: "🫠", color: "#FF8C00", glyph: "heat" }
+
+  # --- Fall ---
+  "False Fall":           { emoji: "🍂", color: "#C98A3B", glyph: "leaf" }
+  "Second Summer":        { emoji: "🌅", color: "#FFB347", glyph: "sunrise" }
+  "Indian Summer":        { emoji: "🌇", color: "#E59866", glyph: "sunrise" }
+  "Actual Fall":          { emoji: "🍁", color: "#D2691E", glyph: "maple" }
+
+  # --- Wet / dark progression ---
+  "The Grey":             { emoji: "🩶", color: "#9AA3A8", glyph: "cloud" }
+  "The Long Dark":        { emoji: "🌑", color: "#3B4A57", glyph: "moon" }
+  "The Dark Wet":         { emoji: "🌧️", color: "#5C6B73", glyph: "rain" }
+  "Brightening Wet":      { emoji: "🌦️", color: "#7FA8C9", glyph: "sun_rain" }
+  "Molding Wet":          { emoji: "🫠", color: "#8FA86B", glyph: "mold" }
+  "Flowering Wet":        { emoji: "🌺", color: "#E84B8A", glyph: "flower" }
+  "Welcome Drizzle":      { emoji: "🌧️", color: "#6FB1C9", glyph: "drizzle" }
+  "Rainy Season":         { emoji: "🌧️", color: "#4A7A96", glyph: "rain" }
+  "Dry Season":           { emoji: "☀️", color: "#E0B040", glyph: "sun" }
+
+  # --- Triggered winter events ---
+  "Find Bananas":         { emoji: "🍌", color: "#FFE135", glyph: "banana" }
+  "Paralyzing Snow":      { emoji: "🚌", color: "#AED6F1", glyph: "bus" }
+
+  # --- First-sun events ---
+  "Praise the Sun":       { emoji: "🌞", color: "#FFD93B", glyph: "sun" }
+  "Glorious Sun":         { emoji: "☀️", color: "#FFB000", glyph: "sun" }
+
+  # --- Sun-without-vitamin-D ---
+  "Photon Fraud":         { emoji: "🌥️", color: "#BFC9CA", glyph: "sun_haze" }
+
+  # --- Constants / recurring traits ---
+  "Spider Season":        { emoji: "🕷️", color: "#6E4B3A", glyph: "spider" }
+  "Convergence Zones":    { emoji: "⚡", color: "#7D5BA6", glyph: "bolt" }
+  "Karl the Fog":         { emoji: "🌫️", color: "#B0BEC5", glyph: "fog" }
+
+  # --- Marine-layer spring/summer ---
+  "May Gray":             { emoji: "☁️", color: "#AEB6BD", glyph: "cloud" }
+  "June Gloom":           { emoji: "🌫️", color: "#9AA7B0", glyph: "fog" }
+  "Fogust":               { emoji: "🌁", color: "#8E9AA3", glyph: "fog" }
+
+  # --- Climate disasters ---
+  "Smogust":              { emoji: "🌫️", color: "#B5651D", glyph: "smoke" }
+  "Smoketember":          { emoji: "🔥", color: "#A0522D", glyph: "smoke" }
+  "Choking Smoke":        { emoji: "😷", color: "#8B0000", glyph: "mask" }
