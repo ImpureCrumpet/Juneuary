@@ -45,10 +45,14 @@ class MicroseasonView:
     emoji: str
     color: str
     glyph: str
+    series_key: str | None = None    # 'winter' | 'spring' | 'summer' | 'fall' | ...
+    series_order: int | None = None
+    series_label: str | None = None  # 'spring1', 'winter2', ...
 
     @classmethod
     def from_row(cls, row: sqlite3.Row) -> "MicroseasonView":
         p = presentation_for(row["canonical_name"])
+        keys = row.keys()
         return cls(
             canonical_name=row["canonical_name"],
             display_name=row["display_name"],
@@ -59,6 +63,9 @@ class MicroseasonView:
             emoji=p.emoji,
             color=p.color,
             glyph=p.glyph,
+            series_key=row["series_key"] if "series_key" in keys else None,
+            series_order=row["series_order"] if "series_order" in keys else None,
+            series_label=row["series_label"] if "series_label" in keys else None,
         )
 
 
@@ -127,11 +134,15 @@ _CLASSIFY_SQL = """
            om.reason                                     AS reason,
            COALESCE(occ.local_name, m.canonical_name)    AS display_name,
            m.canonical_name                              AS canonical_name,
-           m.category                                    AS category
+           m.category                                    AS category,
+           s.key                                         AS series_key,
+           m.series_order                                AS series_order,
+           m.series_label                                AS series_label
     FROM observation_microseasons om
     JOIN observations o              ON o.id   = om.observation_id
     JOIN microseason_occurrences occ ON occ.id = om.occurrence_id
     JOIN microseasons m              ON m.id   = occ.microseason_id
+    LEFT JOIN series s               ON s.id   = m.series_id
     WHERE o.city_id = ? AND o.observed_date = ?
     ORDER BY om.tier, om.confidence DESC, m.canonical_name
 """

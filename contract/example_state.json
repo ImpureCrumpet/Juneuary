@@ -21,7 +21,10 @@
         "reason": "high 61F in 58-66F range",
         "emoji": "🌤️",
         "color": "#F4C430",
-        "glyph": "sun_cloud"
+        "glyph": "sun_cloud",
+        "series_key": "spring",
+        "series_order": 1,
+        "series_label": "spring1"
       }
     ],
     "secondary": [
@@ -34,7 +37,10 @@
         "reason": "background trait active in this window",
         "emoji": "⚡",
         "color": "#7D5BA6",
-        "glyph": "bolt"
+        "glyph": "bolt",
+        "series_key": null,
+        "series_order": null,
+        "series_label": null
       }
     ],
     "triggered": [
@@ -47,7 +53,10 @@
         "reason": "snow in forecast",
         "emoji": "🍌",
         "color": "#FFE135",
-        "glyph": "banana"
+        "glyph": "banana",
+        "series_key": null,
+        "series_order": null,
+        "series_label": null
       }
     ],
     "is_aberration": false,
@@ -71,7 +80,10 @@
       "reason": "high 61F in 58-66F range",
       "emoji": "🌤️",
       "color": "#F4C430",
-      "glyph": "sun_cloud"
+      "glyph": "sun_cloud",
+      "series_key": "spring",
+      "series_order": 1,
+      "series_label": "spring1"
     }
   },
   "forecast": []

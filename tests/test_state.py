@@ -70,8 +70,10 @@ def _seed_db() -> sqlite3.Connection:
         """
         CREATE TABLE cities (id INTEGER PRIMARY KEY, slug TEXT, name TEXT,
                              latitude REAL, longitude REAL);
+        CREATE TABLE series (id INTEGER PRIMARY KEY, key TEXT, name TEXT);
         CREATE TABLE microseasons (id INTEGER PRIMARY KEY, canonical_name TEXT,
-                                   category TEXT);
+                                   category TEXT, series_id INTEGER,
+                                   series_order INTEGER, series_label TEXT);
         CREATE TABLE microseason_occurrences (id INTEGER PRIMARY KEY,
                                    microseason_id INTEGER, city_id INTEGER,
                                    local_name TEXT);
@@ -85,8 +87,12 @@ def _seed_db() -> sqlite3.Connection:
         """
     )
     conn.execute("INSERT INTO cities VALUES (1,'seattle','Seattle',47.6,-122.3)")
-    conn.execute("INSERT INTO microseasons VALUES (10,'Fool''s Spring','series')")
-    conn.execute("INSERT INTO microseasons VALUES (11,'Find Bananas','triggered_event')")
+    conn.execute("INSERT INTO series VALUES (1,'spring','Spring')")
+    conn.execute("INSERT INTO microseasons (id,canonical_name,category,series_id,"
+                 "series_order,series_label) VALUES "
+                 "(10,'Fool''s Spring','series',1,1,'spring1')")
+    conn.execute("INSERT INTO microseasons (id,canonical_name,category) VALUES "
+                 "(11,'Find Bananas','triggered_event')")
     conn.execute("INSERT INTO microseason_occurrences VALUES (100,10,1,NULL)")
     conn.execute("INSERT INTO microseason_occurrences VALUES (101,11,1,NULL)")
     conn.execute(

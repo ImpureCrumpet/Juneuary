@@ -30,8 +30,10 @@ def _seed_db(path: str) -> None:
         """
         CREATE TABLE cities (id INTEGER PRIMARY KEY, slug TEXT, name TEXT,
                              latitude REAL, longitude REAL);
+        CREATE TABLE series (id INTEGER PRIMARY KEY, key TEXT, name TEXT);
         CREATE TABLE microseasons (id INTEGER PRIMARY KEY, canonical_name TEXT,
-                                   category TEXT);
+                                   category TEXT, series_id INTEGER,
+                                   series_order INTEGER, series_label TEXT);
         CREATE TABLE microseason_occurrences (id INTEGER PRIMARY KEY,
                                    microseason_id INTEGER, city_id INTEGER,
                                    local_name TEXT);
@@ -43,7 +45,9 @@ def _seed_db(path: str) -> None:
                                    occurrence_id INTEGER, tier TEXT,
                                    confidence REAL, reason TEXT);
         INSERT INTO cities VALUES (1,'seattle','Seattle',47.6,-122.3);
-        INSERT INTO microseasons VALUES (10,'Fool''s Spring','series');
+        INSERT INTO series VALUES (1,'spring','Spring');
+        INSERT INTO microseasons (id,canonical_name,category,series_id,series_order,
+                                  series_label) VALUES (10,'Fool''s Spring','series',1,1,'spring1');
         INSERT INTO microseason_occurrences VALUES (100,10,1,NULL);
         INSERT INTO observations VALUES (1000,1,'2026-02-14',61,44,0,0,0,NULL);
         INSERT INTO observation_microseasons VALUES (1000,100,'primary',0.8,'fits');
