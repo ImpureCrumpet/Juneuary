@@ -222,14 +222,21 @@ def build_days_payload(
 
     if city:
         row = conn.execute(
-            "SELECT slug, name, latitude, longitude FROM cities WHERE slug = ?",
+            """
+            SELECT c.slug, c.name, c.latitude, c.longitude,
+                   (SELECT p.slug FROM cities p WHERE p.id = c.parent_city_id) AS parent_slug
+            FROM cities c WHERE c.slug = ?
+            """,
             [city],
         ).fetchone()
         if row is None:
             raise ValueError(f"unknown city: {city}")
         slug, name = row["slug"], row["name"]
         use_lat, use_lng = row["latitude"], row["longitude"]
-        location = Location(slug, name, use_lat, use_lng, source="catalog")
+        # catalog_slug points at the parent for child cities (so consumers can
+        # inherit the parent's catalog/narrative); null for top-level cities.
+        location = Location(slug, name, use_lat, use_lng, source="catalog",
+                            catalog_slug=row["parent_slug"])
     elif lat is not None and lng is not None:
         nearest = nearest_catalog_city(conn, lat, lng)
         if nearest is None:
