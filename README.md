@@ -46,7 +46,7 @@ Vendored from [Gargoyle-Apps/skills-harness](https://github.com/Gargoyle-Apps/sk
 | Skill | Purpose |
 |-------|---------|
 | `j-weather-sync` | Fetch Open-Meteo → SQLite, re-classify |
-| `j-ytd-report` | Combined YTD report (summary, timeline, tables) |
+| `j-ytd-report` | YTD report with vernacular narrative + emoji (summary, timeline, tables) |
 | `j-report-review` | Verify reports against live Open-Meteo |
 
 Update the kit: `git subtree pull --prefix=.skills-harness skills-harness main --squash` (see **harness-subtree** skill).

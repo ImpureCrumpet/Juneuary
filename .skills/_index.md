@@ -13,5 +13,5 @@ Read the full `SKILL.md` only at that point — never preemptively.
 | skill-author | How to write a new SKILL.md from scratch and register it in the index. | write a skill, author a skill, new skill, add a skill |
 | skill-template | Canonical SKILL.md format with authoring notes and refactor guide. | new skill, skill format, create skill, reformat skill, convert rule |
 | j-weather-sync | Fetch Open-Meteo observations into the SQLite DB and re-classify for a city and date range. | fetch weather, sync weather, open-meteo, backfill observations, refresh forecast days, update microseasons db |
-| j-ytd-report | Generate the combined YTD report — summary, numbers, monthly story, season timeline, and tables. | ytd report, generate report, microseason report, narrative report, season timeline, write up the year, seattle report |
+| j-ytd-report | Generate the YTD report — vernacular narrative with emoji, numbers, monthly story, season timeline, and tables. | ytd report, generate report, microseason report, narrative report, season timeline, write up the year, seattle report |
 | j-report-review | Verify report numbers against a live Open-Meteo fetch, not just the local DB. | review report, check report accuracy, verify against open-meteo, report code review, is the report right |

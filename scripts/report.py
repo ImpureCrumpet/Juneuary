@@ -13,6 +13,7 @@ Example:
 from __future__ import annotations
 
 import argparse
+import re
 import sqlite3
 import sys
 from collections import Counter, defaultdict
@@ -34,6 +35,107 @@ MONTH_SHORT = [
     "", "Jan", "Feb", "Mar", "Apr", "May", "Jun",
     "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
 ]
+
+# Text-passable UTF-8 emoji for markdown reports (GitHub, terminals, plain text).
+MS_EMOJI: dict[str, str] = {
+    "Find Bananas": "🍌",
+    "Paralyzing Snow": "🚌",
+    "Winter": "❄️",
+    "Second Winter": "🥶",
+    "Third Winter": "🌨️",
+    "Fool's Spring": "🌤️",
+    "Spring of Deception": "🌸",
+    "The Pollening": "🤧",
+    "Actual Spring": "🌷",
+    "Juneuary": "🌫️",
+    "Summer": "☀️",
+    "Hell's Front Porch": "🔥",
+    "Oppressive Sun": "🫠",
+    "False Fall": "🍂",
+    "Second Summer": "🌅",
+    "Actual Fall": "🍁",
+    "The Grey": "🩶",
+    "The Long Dark": "🌑",
+    "The Dark Wet": "🌧️",
+    "Brightening Wet": "🌦️",
+    "Molding Wet": "🫠",
+    "Flowering Wet": "🌺",
+    "Welcome Drizzle": "🌧️",
+    "Praise the Sun": "🌞",
+    "Glorious Sun": "☀️",
+    "Photon Fraud": "🌥️",
+    "Smogust": "🌫️",
+    "Smoketember": "🔥",
+    "Choking Smoke": "😷",
+    "Convergence Zones": "⚡",
+    "Spider Season": "🕷️",
+}
+
+TERM_EMOJI: dict[str, str] = {
+    "snowmageddon": "🌨️",
+    "snow siege": "❄️",
+    "banana weather": "🍌",
+    "false spring": "🌤️",
+    "The Snow Siege": "🌨️",
+    "Banana Weather": "🍌",
+}
+
+SECTION_EMOJI: dict[str, str] = {
+    "YTD Summary": "📋",
+    "The numbers": "📊",
+    "Monthly story": "📅",
+    "Season timeline": "🗓️",
+    "Series progression": "🔁",
+    "Triggered events": "⚡",
+    "Notable days": "📌",
+    "Method": "🔬",
+}
+
+STAT_ROW_EMOJI: dict[str, str] = {
+    "Total precip": "🌧️",
+    "Total snowfall": "❄️",
+    "Days low": "🥶",
+    "Days high ≥ 60": "🌤️",
+    "Days high ≥ 70": "☀️",
+    "Coldest low": "🧊",
+    "Hottest high": "🔥",
+}
+
+
+def emojify(text: str) -> str:
+    """Prefix known microseason / narrative terms with emoji (idempotent)."""
+    for term, emoji in sorted(
+        {**MS_EMOJI, **TERM_EMOJI}.items(), key=lambda x: -len(x[0])
+    ):
+        bare = f"**{term}**"
+        marked = f"{emoji} {bare}"
+        # Per-occurrence: skip if this instance is already tagged (not whole-doc).
+        text = re.sub(
+            rf"(?<!{re.escape(emoji)} ){re.escape(bare)}",
+            marked,
+            text,
+        )
+    return text
+
+
+def tag(name: str) -> str:
+    """Microseason name with emoji, for inline prose."""
+    emoji = MS_EMOJI.get(name, "")
+    return f"{emoji} **{name}**" if emoji else f"**{name}**"
+
+
+def arc_line(names: list[str]) -> str:
+    return " → ".join(tag(n) for n in names)
+
+
+def section_heading(title: str) -> str:
+    emoji = SECTION_EMOJI.get(title, "")
+    prefix = f"{emoji} " if emoji else ""
+    return f"## {prefix}{title}"
+
+
+def subsection_heading(title: str, emoji: str = "") -> str:
+    return f"### {f'{emoji} ' if emoji else ''}{title}"
 
 
 def open_db(path: Path) -> sqlite3.Connection:
@@ -222,6 +324,66 @@ def compute_stats(
 
 
 # ---------------------------------------------------------------------------
+# Narrative context (microseason vernacular per month / period)
+# ---------------------------------------------------------------------------
+
+@dataclass
+class MonthContext:
+    month: int
+    triggered: Counter[str] = field(default_factory=Counter)
+    series: Counter[str] = field(default_factory=Counter)
+    calendar: Counter[str] = field(default_factory=Counter)
+    peak_snow: tuple[str, float] | None = None   # (date, inches)
+    peak_hi: tuple[str, float] | None = None
+    peak_precip: tuple[str, float] | None = None
+
+
+def build_month_contexts(
+    observations: list[sqlite3.Row],
+    classifications: list[sqlite3.Row],
+) -> dict[int, MonthContext]:
+    ctx: dict[int, MonthContext] = {}
+    for o in observations:
+        m = int(o["observed_date"][5:7])
+        c = ctx.setdefault(m, MonthContext(month=m))
+        sn = o["snow_in"] or 0
+        if sn >= 0.1 and (c.peak_snow is None or sn > c.peak_snow[1]):
+            c.peak_snow = (o["observed_date"], sn)
+        hi = o["temp_high_f"]
+        if hi is not None and (c.peak_hi is None or hi > c.peak_hi[1]):
+            c.peak_hi = (o["observed_date"], hi)
+        pr = o["precip_in"] or 0
+        if pr > 0 and (c.peak_precip is None or pr > c.peak_precip[1]):
+            c.peak_precip = (o["observed_date"], pr)
+
+    for row in classifications:
+        m = int(row["d"][5:7])
+        c = ctx.setdefault(m, MonthContext(month=m))
+        if row["tier"] == "triggered":
+            c.triggered[row["canonical_name"]] += 1
+        elif row["tier"] == "primary":
+            if row["category"] == "series":
+                c.series[row["canonical_name"]] += 1
+            elif row["category"] == "calendar":
+                c.calendar[row["canonical_name"]] += 1
+    return ctx
+
+
+def _top(counter: Counter[str], n: int = 2) -> list[str]:
+    return [name for name, _ in counter.most_common(n)]
+
+
+def _snowmageddon_label(snow_days: int, peak_in: float, total_in: float = 0) -> str:
+    if peak_in >= 4 or total_in >= 8 or (snow_days >= 5 and peak_in >= 2.5):
+        return "snowmageddon"
+    if snow_days >= 3 or peak_in >= 1.5 or total_in >= 4:
+        return "snow siege"
+    if snow_days >= 1:
+        return "banana weather"
+    return ""
+
+
+# ---------------------------------------------------------------------------
 # Formatting helpers
 # ---------------------------------------------------------------------------
 
@@ -271,79 +433,265 @@ def _fmt_delta(v, suffix: str = "°F") -> str:
     return f"{sign}{v:.2f}{suffix}"
 
 
-def _month_story_line(ms: MonthStats) -> str:
+def _month_story_line(ms: MonthStats, ctx: MonthContext) -> str:
+    """One vivid paragraph per month using microseason vernacular."""
     m = MONTH_NAMES[ms.month]
-    parts: list[str] = []
-    if ms.d_hi is not None:
-        if ms.d_hi <= -5:
-            parts.append(f"**cold month** (highs {ms.d_hi:+.0f}°F vs normal)")
-        elif ms.d_hi >= 5:
-            parts.append(f"**warm month** (highs {ms.d_hi:+.0f}°F)")
-        elif abs(ms.d_hi) >= 2:
-            parts.append(f"highs {ms.d_hi:+.0f}°F vs normal")
-    if ms.d_lo is not None and ms.d_lo >= 2 and (ms.d_hi is None or ms.d_hi < 3):
-        parts.append(f"mild nights (+{ms.d_lo:.0f}°F on lows)")
-    if ms.d_precip is not None and ms.d_precip >= 2:
-        parts.append(f"**very wet** ({ms.precip:.1f} in, {ms.d_precip:+.1f} in vs norm)")
-    elif ms.d_precip is not None and ms.d_precip <= -1:
-        parts.append(f"dry ({ms.precip:.1f} in)")
-    if ms.snow_days >= 3 or ms.snow >= 3:
-        parts.append(f"**{ms.snow_days} snow days** ({ms.snow:.1f} in total)")
-    elif ms.snow_days >= 1:
-        parts.append(f"{ms.snow_days} snow day(s)")
-    if ms.freeze_days >= 5:
-        parts.append(f"{ms.freeze_days} sub-freezing lows")
-    if ms.days < 28 and ms.norm_precip and ms.days < 31:
-        parts.append(f"*{ms.days} days in period — compare precip to full-month normal cautiously*")
-    if not parts:
-        if ms.avg_hi is not None and ms.norm_hi is not None:
-            parts.append(f"near-normal (avg high {_fmt(ms.avg_hi)})")
+    series = _top(ctx.series, 1)
+    calendar = _top(ctx.calendar, 2)
+    trig = ctx.triggered
+
+    bananas = trig.get("Find Bananas", 0)
+    paralyzing = trig.get("Paralyzing Snow", 0)
+    photon = trig.get("Photon Fraud", 0)
+    drizzle = trig.get("Welcome Drizzle", 0)
+    peak_snow = ctx.peak_snow[1] if ctx.peak_snow else 0
+    snow_label = _snowmageddon_label(ms.snow_days, peak_snow, ms.snow)
+
+    # --- month-specific voice ---
+    if ms.month == 1:
+        vibe = calendar[0] if calendar else "Winter"
+        text = (
+            f"**{m}** opened under **{vibe}** and **The Long Dark** — "
+            f"grey, mid-40s, nothing telegraphing what was coming. "
+        )
+        if ms.d_precip is not None and ms.d_precip <= -1:
+            text += f"Drier than usual ({ms.precip:.1f} in). "
+        if photon:
+            text += f"**Photon Fraud** days ({photon}) — sun visible, vitamin D not included. "
+        return f"- {text.rstrip()}"
+
+    if ms.month == 2:
+        if snow_label == "snowmageddon":
+            text = (
+                f"**{m}** was the year. **The Long Dark** turned into **{snow_label}**: "
+                f"**Find Bananas** panic on {bananas} day(s), **Paralyzing Snow** on {paralyzing} — "
+                f"buses jackknifing, QFC stripped of bread, milk, and bananas. "
+            )
+            if ctx.peak_snow:
+                text += (
+                    f"Peak accumulation **{ctx.peak_snow[1]:.1f}\"** on "
+                    f"{humanize_date(ctx.peak_snow[0])}. "
+                )
+            d_hi = f" ({ms.d_hi:+.0f}°F vs normal)" if ms.d_hi is not None else ""
+            text += (
+                f"Highs averaged {_fmt(ms.avg_hi)}{d_hi}. "
+                f"This was **Winter**, not **Fool's Spring** — any tomato-start optimism died in the snowpack."
+            )
+            return f"- {text}"
+        if snow_label:
+            text = (
+                f"**{m}** — **{snow_label}** inside **Winter**: "
+                f"**Find Bananas** ({bananas}d), **Paralyzing Snow** ({paralyzing}d). "
+            )
+            if ctx.peak_snow:
+                text += f"Peak **{ctx.peak_snow[1]:.1f}\"** on {humanize_date(ctx.peak_snow[0])}. "
+            return f"- {text.rstrip()}"
+        text = (
+            f"**{m}** — **Fool's Spring** teased through **Brightening Wet** "
+            f"({_fmt(ms.avg_hi)} avg high); no **Paralyzing Snow** to speak of."
+        )
+        return f"- {text}"
+
+    if ms.month == 3:
+        dom = series[0] if series else "Spring of Deception"
+        text = f"**{m}** — **{dom}**"
+        if ms.snow_days:
+            text += f" with **Second Winter** echoes ({ms.snow_days} trace-snow day(s))"
+        if ms.d_precip is not None and ms.d_precip <= -1.5:
+            text += f", dry and bright ({ms.precip:.1f} in)"
+        if ctx.peak_hi and ctx.peak_hi[1] >= 65:
+            text += (
+                f", then the **false spring**: **{ctx.peak_hi[1]:.0f}°F** on "
+                f"{humanize_date(ctx.peak_hi[0])} — three weeks after the snow siege, "
+                f"forgiven for planting something you shouldn't have"
+            )
+        text += "."
+        return f"- {text}"
+
+    if ms.month == 4:
+        text = (
+            f"**{m}** — **Third Winter** whiplash inside **Flowering Wet**: "
+            f"blossoms and cold rain, 60°F afternoons that lied. "
+        )
+        if ms.d_hi is not None and ms.d_hi <= -3:
+            text += f"Cooler than normal ({ms.d_hi:+.0f}°F on highs). "
+        return f"- {text.rstrip()}"
+
+    if ms.month == 5:
+        text = (
+            f"**{m}** — **Actual Spring** finally showed up: "
+            f"reliable sun-breaks, {_fmt(ms.avg_hi)} highs, the year exhaled. "
+        )
+        if ms.d_precip is not None and ms.d_precip <= -0.5:
+            text += "Dry enough to believe it."
+        return f"- {text.rstrip()}"
+
+    if ms.month == 6:
+        text = f"**{m}** — "
+        if "Juneuary" in calendar or (ms.d_hi is not None and ms.d_hi <= -2):
+            text += (
+                "**Juneuary** marine layer — cool, cloudy, drizzle-adjacent "
+                f"({_fmt(ms.avg_hi)} avg high"
+            )
+            if ms.d_hi is not None:
+                text += f", {ms.d_hi:+.0f}°F vs normal"
+            text += "). "
         else:
-            parts.append("unremarkable vs normals")
-    detail = "; ".join(parts)
-    hi_lo = ""
-    if ms.avg_hi is not None and ms.avg_lo is not None:
-        hi_lo = f" Avg {_fmt(ms.avg_hi)} / {_fmt(ms.avg_lo)}."
-    return f"- **{m}** — {detail}.{hi_lo}"
+            text += f"**Actual Spring** bleeding into summer ({_fmt(ms.avg_hi)} avg high). "
+        if ctx.peak_hi and ctx.peak_hi[1] >= 78:
+            text += f"A **{ctx.peak_hi[1]:.0f}°F** spike on {humanize_date(ctx.peak_hi[0])} teased **Summer** early."
+        return f"- {text.rstrip()}"
+
+    if ms.month in (7, 8):
+        label = "**Summer**"
+        if trig.get("Smogust") or trig.get("Smoketember"):
+            label += " / **Smoketember** smoke"
+        elif trig.get("Oppressive Sun") or trig.get("Hell's Front Porch"):
+            label += " pushing **Hell's Front Porch**"
+        text = f"**{m}** — {label}: "
+        if ms.d_hi is not None and ms.d_hi <= -3:
+            text += (
+                f"cooler than the brochure ({_fmt(ms.avg_hi)} avg, {ms.d_hi:+.0f}°F vs normal) "
+                f"but still {ms.days_60}+ days at 60°F+. "
+            )
+        else:
+            text += f"dry, warm, {_fmt(ms.avg_hi)} highs — the reason anyone tolerates the other ten months. "
+        if ctx.peak_hi and ctx.peak_hi[1] >= 80:
+            text += f"Peak **{ctx.peak_hi[1]:.0f}°F** on {humanize_date(ctx.peak_hi[0])}."
+        return f"- {text.rstrip()}"
+
+    if ms.month == 9:
+        text = f"**{m}** — **Second Summer** golden light"
+        if drizzle:
+            text += f" interrupted by **Welcome Drizzle** ({drizzle} day(s)) — rain washing summer out of the air"
+        if ms.d_precip is not None and ms.d_precip >= 2:
+            text += f", and wet ({ms.precip:.1f} in, {ms.d_precip:+.1f} in vs norm)"
+        text += "."
+        return f"- {text}"
+
+    if ms.month in (10, 11):
+        text = (
+            f"**{m}** — **Actual Fall** → **The Grey**: "
+            f"sweater weather, leaves, the lid coming down ({_fmt(ms.avg_hi)} avg high). "
+        )
+        if drizzle:
+            text += f"**Welcome Drizzle** on {drizzle} day(s). "
+        return f"- {text.rstrip()}"
+
+    if ms.month == 12:
+        text = f"**{m}** — back into **Winter** and **The Dark Wet**"
+        if ms.d_precip is not None and ms.d_precip >= 1.5:
+            text += f", soaking close ({ms.precip:.1f} in)"
+        if bananas:
+            text += f"; **Find Bananas** on {bananas} day(s) — trace snow, full panic"
+        text += "."
+        return f"- {text}"
+
+    # fallback
+    dom = series[0] if series else (calendar[0] if calendar else "the grey")
+    return (
+        f"- **{m}** — dominated by **{dom}** "
+        f"({_fmt(ms.avg_hi)} / {_fmt(ms.avg_lo)} avg)."
+    )
 
 
-def _ytd_headline(stats: YtdStats, triggered: list[sqlite3.Row]) -> str:
+def _ytd_summary_prose(
+    stats: YtdStats,
+    month_ctx: dict[int, MonthContext],
+    classifications: list[sqlite3.Row],
+) -> list[str]:
+    """Opening paragraphs in microseason vernacular."""
+    paragraphs: list[str] = []
+    triggered = [c for c in classifications if c["tier"] == "triggered"]
+    bananas = sum(1 for c in triggered if c["canonical_name"] == "Find Bananas")
+    paralyzing = sum(1 for c in triggered if c["canonical_name"] == "Paralyzing Snow")
     feb = stats.months.get(2)
     mar = stats.months.get(3)
-    bits: list[str] = []
 
-    if feb and feb.d_hi is not None and feb.d_hi <= -5 and feb.snow_days >= 3:
-        bits.append("a **real winter** anchored by February snow")
-    elif stats.freeze_days <= 6 and feb and feb.d_lo is not None and feb.d_lo >= 2:
-        bits.append("a **mild winter** with few hard freezes")
-    elif stats.freeze_days >= 15:
-        bits.append("a **cold year** with many sub-freezing nights")
+    # Lead paragraph
+    if feb and feb.snow_days >= 1:
+        peak = month_ctx.get(2, MonthContext(2)).peak_snow
+        peak_s = f" (**{peak[1]:.1f}\"** on {humanize_date(peak[0])})" if peak else ""
+        feb_label = _snowmageddon_label(feb.snow_days, peak[1] if peak else 0, feb.snow)
+        if feb_label == "snowmageddon":
+            paragraphs.append(
+                f"If you lived through this period, you remember February's **snowmageddon** — "
+                f"**Find Bananas** on {bananas} day(s), **Paralyzing Snow** on {paralyzing}{peak_s}. "
+                f"The rest of the year was comparatively gentle, but February did the talking."
+            )
+        elif feb_label in ("snow siege", "banana weather"):
+            cold_bit = (
+                f"{feb.d_hi:+.0f}°F on highs" if feb.d_hi is not None else "well below normal"
+            )
+            paragraphs.append(
+                f"**February** was **The Long Dark** in force — cold ({cold_bit}), "
+                f"**Find Bananas** on {bananas} day(s) over trace snow{peak_s}. "
+                f"Not a full **snowmageddon**, but **Paralyzing Snow** fired {paralyzing} day(s) "
+                f"and the city acted like it was the end times."
+            )
+    elif stats.freeze_days <= 6:
+        paragraphs.append(
+            "This was a **mild winter** year — **The Long Dark** without many hard freezes, "
+            "**Fool's Spring** teases that almost convinced you, and no real **Paralyzing Snow**."
+        )
     else:
-        bits.append("a mixed winter")
+        paragraphs.append(
+            f"A mixed **Winter** year — {stats.freeze_days} sub-freezing nights, "
+            f"**The Dark Wet** doing its job."
+        )
 
-    if mar and mar.d_hi is not None and mar.d_hi >= -2 and mar.d_precip is not None and mar.d_precip <= -1:
-        if feb and feb.snow_days >= 2:
-            bits.append("a **March fake-out** after the snow")
-        else:
-            bits.append("an early **false spring** in March")
-    elif mar and mar.d_precip is not None and mar.d_precip >= 2:
-        bits.append("a **soaking March**")
+    # Spring arc
+    series_days = Counter(
+        c["canonical_name"] for c in classifications
+        if c["tier"] == "primary" and c["category"] == "series"
+    )
+    spring_arc = ["Fool's Spring", "Second Winter", "Spring of Deception",
+                  "Third Winter", "Actual Spring"]
+    fired = [s for s in spring_arc if series_days.get(s, 0) > 0]
+    if fired:
+        arc = arc_line(fired)
+        feb_peak = month_ctx.get(2, MonthContext(2)).peak_snow
+        feb_was_snow = _snowmageddon_label(
+            feb.snow_days if feb else 0,
+            feb_peak[1] if feb_peak else 0,
+            feb.snow if feb else 0,
+        ) == "snowmageddon" if feb else False
+        if mar and mar.d_precip is not None and mar.d_precip <= -1 and feb_was_snow:
+            paragraphs.append(
+                f"The spring **lies** ran in order: {arc}. "
+                f"March's **Spring of Deception** hit especially hard — warmth after **snowmageddon**, "
+                f"dry enough to feel like absolution."
+            )
+        elif mar and mar.d_precip is not None and mar.d_precip <= -1 and feb and feb.snow_days >= 1:
+            paragraphs.append(
+                f"The spring **lies** ran in order: {arc}. "
+                f"March's **Spring of Deception** offered warmth after a punishing **Winter** — "
+                f"dry enough to feel like absolution."
+            )
+        elif len(fired) >= 3:
+            paragraphs.append(
+                f"Seattle's recursive spring played out: {arc} — "
+                f"each fake-out more convincing than the last until **Actual Spring** stuck."
+            )
 
-    summer_months = [stats.months.get(m) for m in (6, 7, 8) if m in stats.months]
-    cool_summer = sum(1 for sm in summer_months if sm and sm.d_hi is not None and sm.d_hi <= -2)
-    if cool_summer >= 2:
-        bits.append("a **cooler-than-normal summer**")
-    elif stats.days_80 >= 10:
-        bits.append("a **hot summer**")
-    elif stats.days_70 >= 30:
-        bits.append("a solid summer")
+    # Summer / fall note
+    summer_cool = sum(
+        1 for m in (6, 7, 8)
+        if (sm := stats.months.get(m)) and sm.d_hi is not None and sm.d_hi <= -2
+    )
+    if summer_cool >= 2:
+        paragraphs.append(
+            f"**Summer** arrived but kept its handbrake on — cooler than normal June through August, "
+            f"no **Hell's Front Porch**, {stats.days_70} days still kissed 70°F+. "
+            f"**Welcome Drizzle** eventually ended the dry spell."
+        )
+    elif stats.days_80 >= 8:
+        paragraphs.append(
+            f"**Summer** brought the heat — {stats.days_80} days at 80°F+, "
+            f"**Oppressive Sun** territory even if the classifier didn't always tag it."
+        )
 
-    snow_events = [c for c in triggered
-                   if c["canonical_name"] in ("Find Bananas", "Paralyzing Snow")]
-    if snow_events:
-        bits.append(f"**{len(snow_events)} snow-event days** (Find Bananas / Paralyzing Snow)")
-
-    return "This period had " + ", then ".join(bits[:3]) + "."
+    return paragraphs
 
 
 # ---------------------------------------------------------------------------
@@ -352,7 +700,7 @@ def _ytd_headline(stats: YtdStats, triggered: list[sqlite3.Row]) -> str:
 
 def render_header(city: sqlite3.Row, start: str, end: str, total_days: int) -> str:
     return (
-        f"# {city['name']} — YTD Microseasons Report\n\n"
+        f"# 🌲 {city['name']} — YTD Microseasons Report\n\n"
         f"**Generated:** {date.today().isoformat()}  \n"
         f"**Period:** {start} → {end} ({total_days} days)  \n"
         f"**Weather:** Open-Meteo (ERA5 archive + forecast)  \n"
@@ -365,26 +713,47 @@ def render_ytd_summary(
     stats: YtdStats,
     classifications: list[sqlite3.Row],
     observations: list[sqlite3.Row],
+    month_ctx: dict[int, MonthContext],
 ) -> str:
     triggered = [c for c in classifications if c["tier"] == "triggered"]
     by_tier = defaultdict(set)
     for c in classifications:
         by_tier[c["tier"]].add(c["canonical_name"])
 
-    lines = [
-        "## YTD Summary",
-        "",
-        _ytd_headline(stats, triggered),
-        "",
-        f"- **{stats.total_days}** observed days; **{stats.primary_days}** with a primary microseason "
-        f"({stats.primary_days * 100 // max(stats.total_days, 1)}%). "
-        f"Primary labels overlap — multiple per day is normal.",
-        f"- **{len(by_tier['triggered'])}** triggered event types fired; "
-        f"**{sum(1 for o in observations if o['is_aberration'])}** aberration days.",
-        "",
-    ]
+    lines = [section_heading("YTD Summary"), ""]
+    for para in _ytd_summary_prose(stats, month_ctx, classifications):
+        lines.append(para)
+        lines.append("")
 
-    # False-spring arc (series slots in order)
+    # Triggered highlights in vernacular
+    highlights: list[str] = []
+    if by_tier["triggered"]:
+        if "Find Bananas" in by_tier["triggered"]:
+            n = sum(1 for c in triggered if c["canonical_name"] == "Find Bananas")
+            highlights.append(f"{tag('Find Bananas')} ({n} day(s) — the QFC banana run)")
+        if "Paralyzing Snow" in by_tier["triggered"]:
+            n = sum(1 for c in triggered if c["canonical_name"] == "Paralyzing Snow")
+            highlights.append(f"{tag('Paralyzing Snow')} ({n} day(s) — hills abandoned)")
+        if "Photon Fraud" in by_tier["triggered"]:
+            n = sum(1 for c in triggered if c["canonical_name"] == "Photon Fraud")
+            highlights.append(f"{tag('Photon Fraud')} ({n} day(s) — useless sun)")
+        if "Welcome Drizzle" in by_tier["triggered"]:
+            n = sum(1 for c in triggered if c["canonical_name"] == "Welcome Drizzle")
+            highlights.append(f"{tag('Welcome Drizzle')} ({n} day(s) — summer's curtain call)")
+        if "Praise the Sun" in by_tier["triggered"]:
+            highlights.append(
+                f"{tag('Praise the Sun')} (first real sun after {tag('The Long Dark')})"
+            )
+        if "Glorious Sun" in by_tier["triggered"]:
+            highlights.append(f"{tag('Glorious Sun')} (warm enough to feel it)")
+        for smoke in ("Smogust", "Smoketember", "Choking Smoke"):
+            if smoke in by_tier["triggered"]:
+                highlights.append(f"{tag(smoke)} (wildfire smoke season)")
+
+    if highlights:
+        lines.append("⚡ **Triggered microseasons that fired:** " + "; ".join(highlights) + ".")
+        lines.append("")
+
     series_days = Counter(
         c["canonical_name"] for c in classifications
         if c["tier"] == "primary" and c["category"] == "series"
@@ -393,40 +762,69 @@ def render_ytd_summary(
                   "Third Winter", "Actual Spring"]
     fired = [s for s in spring_arc if series_days.get(s, 0) > 0]
     if fired:
-        lines.append("**Spring series arc:** " + " → ".join(fired) + ".")
+        lines.append(f"🔁 **Spring series arc:** {arc_line(fired)}.")
         lines.append("")
 
-    return "\n".join(lines)
+    return emojify("\n".join(lines))
 
 
 def render_the_numbers(stats: YtdStats) -> str:
     d_precip = stats.total_precip - stats.norm_precip_sum if stats.norm_precip_sum else None
     coldest = stats.coldest
     hottest = stats.hottest
+    def stat_row(label: str, observed: str, delta: str, notes: str = "") -> str:
+        key = next((k for k in STAT_ROW_EMOJI if label.startswith(k)), label)
+        emoji = STAT_ROW_EMOJI.get(key, "")
+        return f"| {emoji} {label} | {observed} | {delta} | {notes} |"
+
     lines = [
-        "## The numbers",
+        section_heading("The numbers"),
         "",
         "| | Observed | vs Normal | Notes |",
         "| --- | ---: | ---: | --- |",
-        f"| Total precip | **{stats.total_precip:.1f} in** | "
-        f"{_fmt_delta(d_precip, ' in') if d_precip is not None else '—'} | |",
-        f"| Total snowfall (ERA5) | **{stats.total_snow:.1f} in** | — | grid-cell estimate |",
-        f"| Days low &lt; 32°F | **{stats.freeze_days}** | — | |",
-        f"| Days high ≥ 60°F | **{stats.days_60}** | — | |",
-        f"| Days high ≥ 70°F | **{stats.days_70}** | — | |",
-        f"| Coldest low | **{_fmt(coldest[1]) if coldest else '—'}** | — | "
-        f"{humanize_date(coldest[0]) if coldest else ''} |",
-        f"| Hottest high | **{_fmt(hottest[1]) if hottest else '—'}** | — | "
-        f"{humanize_date(hottest[0]) if hottest else ''} |",
+        stat_row(
+            "Total precip",
+            f"**{stats.total_precip:.1f} in**",
+            _fmt_delta(d_precip, " in") if d_precip is not None else "—",
+        ),
+        stat_row(
+            "Total snowfall (ERA5)",
+            f"**{stats.total_snow:.1f} in**",
+            "—",
+            "grid-cell estimate",
+        ),
+        stat_row("Days low &lt; 32°F", f"**{stats.freeze_days}**", "—"),
+        stat_row("Days high ≥ 60°F", f"**{stats.days_60}**", "—"),
+        stat_row("Days high ≥ 70°F", f"**{stats.days_70}**", "—"),
+        stat_row(
+            "Coldest low",
+            f"**{_fmt(coldest[1]) if coldest else '—'}**",
+            "—",
+            humanize_date(coldest[0]) if coldest else "",
+        ),
+        stat_row(
+            "Hottest high",
+            f"**{_fmt(hottest[1]) if hottest else '—'}**",
+            "—",
+            humanize_date(hottest[0]) if hottest else "",
+        ),
         "",
     ]
     return "\n".join(lines)
 
 
-def render_monthly_story(stats: YtdStats) -> str:
-    lines = ["## Monthly story", ""]
+def render_monthly_story(
+    stats: YtdStats, month_ctx: dict[int, MonthContext]
+) -> str:
+    lines = [
+        section_heading("Monthly story"),
+        "",
+        "_📖 Each month in the microseason vernacular — the names locals actually use._",
+        "",
+    ]
     for m in sorted(stats.months):
-        lines.append(_month_story_line(stats.months[m]))
+        ctx = month_ctx.get(m, MonthContext(month=m))
+        lines.append(emojify(_month_story_line(stats.months[m], ctx)))
     lines.append("")
     return "\n".join(lines)
 
@@ -448,7 +846,14 @@ def render_season_timeline(
     start = date.fromisoformat(observations[0]["observed_date"])
     end = date.fromisoformat(observations[-1]["observed_date"])
 
-    lines = ["## Season timeline", ""]
+    lines = [
+        section_heading("Season timeline"),
+        "",
+        "_🗺️ Biweekly chapters in microseason vernacular. Triggered events "
+        f"({tag('Find Bananas')}, {tag('Paralyzing Snow')}, {tag('Welcome Drizzle')}, etc.) "
+        "are the signal-driven moments that punctuate the calendar._",
+        "",
+    ]
     cur = start
     while cur <= end:
         chunk_end = min(cur + timedelta(days=BIWEEKLY_DAYS - 1), end)
@@ -486,30 +891,37 @@ def render_season_timeline(
             if key in seen:
                 continue
             seen.add(key)
-            tr_bits.append(f"{c['d'][5:]} {c['display_name']}")
+            e = MS_EMOJI.get(c["canonical_name"], "•")
+            tr_bits.append(f"{c['d'][5:]} {e} {c['display_name']}")
         tr_line = ", ".join(tr_bits[:6])
         if len(tr_bits) > 6:
             tr_line += f", +{len(tr_bits) - 6} more"
 
-        title = f"### {humanize_span(cur.isoformat(), chunk_end.isoformat())} · {dominant}"
-        lines.append(title)
-        lines.append("")
-        weather = (
-            f"**Weather:** ~{avg_hi:.0f}°F avg high ({hi_min:.0f}–{hi_max:.0f}), "
-            f"{precip:.1f} in precip"
-        )
-        if snow_days:
-            weather += f", **{snow_days} snow day(s)**"
-        lines.append(weather + ".")
-        if tr_line:
-            lines.append(f"**Triggered:** {tr_line}.")
+        peak_snow = max((d["snow_in"] or 0 for d in days), default=0)
+        triggered_names = {c["canonical_name"] for c in triggered}
+        chapter = _chunk_title(dominant, snow_days, peak_snow, triggered_names)
+        lines.append(emojify(
+            f"### {humanize_span(cur.isoformat(), chunk_end.isoformat())} · {chapter}"
+        ))
         lines.append("")
 
-        # Short commentary heuristics
-        comment = _chunk_commentary(days, dominant, snow_days, precip, avg_hi)
+        comment = _chunk_commentary(
+            days, dominant, snow_days, precip, avg_hi, triggered_names,
+        )
         if comment:
-            lines.append(f"> *{comment}*")
+            lines.append(emojify(comment))
             lines.append("")
+
+        weather = (
+            f"🌡️ **Weather:** ~{avg_hi:.0f}°F avg high ({hi_min:.0f}–{hi_max:.0f}), "
+            f"🌧️ {precip:.1f} in precip"
+        )
+        if snow_days:
+            weather += f", ❄️ **{snow_days} snow day(s)**"
+        lines.append(weather + ".")
+        if tr_line:
+            lines.append(f"⚡ **Triggered:** {emojify(tr_line)}.")
+        lines.append("")
         lines.append("---")
         lines.append("")
 
@@ -518,29 +930,80 @@ def render_season_timeline(
     return "\n".join(lines)
 
 
+def _chunk_title(
+    dominant: str, snow_days: int, peak_snow: float, triggered_names: set[str],
+) -> str:
+    dom = tag(dominant) if dominant != "—" else dominant
+    if peak_snow >= 4 or "Paralyzing Snow" in triggered_names:
+        return f"**The Snow Siege** · {dom}"
+    if peak_snow >= 1.5 or "Find Bananas" in triggered_names:
+        return f"**Banana Weather** · {dom}"
+    if dominant == "Fool's Spring":
+        return f"**Fool's Spring** (the first lie)"
+    if dominant == "Spring of Deception":
+        return "**Spring of Deception**"
+    if dominant == "Third Winter":
+        return "**Third Winter** (the insult)"
+    if dominant == "Actual Spring":
+        return "**Actual Spring** (the real one)"
+    return dom
+
+
 def _chunk_commentary(
     days: list[sqlite3.Row], dominant: str, snow_days: int,
-    precip: float, avg_hi: float,
+    precip: float, avg_hi: float, triggered_names: set[str],
 ) -> str:
-    if snow_days >= 3:
-        peak = max(days, key=lambda d: d["snow_in"] or 0)
+    peak = max(days, key=lambda d: d["snow_in"] or 0)
+    sn = peak["snow_in"] or 0
+    if sn >= 1.5 or "Paralyzing Snow" in triggered_names:
+        label = "snowmageddon" if sn >= 4 else "snow siege"
         return (
-            f"Lived experience: snow week — peak {peak['snow_in']:.1f}\" on "
-            f"{humanize_date(peak['observed_date'])}. Find Bananas / Paralyzing Snow "
-            f"should appear in triggered events above."
+            f"You remember this week. **{label}** — **Find Bananas** emptied the produce aisle, "
+            f"**Paralyzing Snow** stranded the hill neighborhoods. "
+            f"Peak **{sn:.1f}\"** on {humanize_date(peak['observed_date'])}; "
+            f"highs stuck near {peak['temp_high_f']:.0f}°F. Capitol Hill became a parking lot."
+        )
+    if sn >= 0.1 and snow_days >= 1 and avg_hi < 50:
+        return (
+            f"**Second Winter** echo — trace snow ({sn:.1f}\" on "
+            f"{humanize_date(peak['observed_date'])}). Not **snowmageddon**, "
+            f"just enough to keep you honest."
+        )
+    if "Welcome Drizzle" in triggered_names:
+        return (
+            "**Welcome Drizzle** — the first real rain after summer's dry spell. "
+            "Petrichor, smoke clearing, everyone pretending they missed it."
         )
     if dominant == "Fool's Spring" and avg_hi >= 50:
-        return "Lived experience: early warm tease — false spring territory."
+        return (
+            "**Fool's Spring** — shorts on Capitol Hill, tomato starts purchased, "
+            "Second Winter loading in the background."
+        )
     if dominant == "Spring of Deception" and avg_hi >= 55:
-        return "Lived experience: convincing spring that may still reverse."
+        return (
+            "**Spring of Deception** — warm enough to uncover patio furniture, "
+            "cold enough to regret it. Blossoms + betrayal."
+        )
+    if dominant == "Third Winter":
+        return (
+            "**Third Winter** — the final insult after the spring fake-outs. "
+            "Flowering trees, hail, maybe snow. Classic Seattle whiplash."
+        )
     if dominant == "Actual Spring" and avg_hi >= 62:
-        return "Lived experience: spring finally stuck."
+        return "**Actual Spring** — brief, real, jacket-optional evenings. It stuck."
     if precip >= 3:
-        return "Lived experience: relentless rain — convergence-zone soak."
+        return (
+            "**Molding Wet** / **Convergence Zones** energy — relentless soak, "
+            "five miles south it's dry."
+        )
     if dominant == "Winter" and avg_hi < 45:
-        return "Lived experience: proper winter grey and cold."
+        return "**The Long Dark** — sunset at 4:20, airborne dampness, low-grade despair."
     if dominant == "Summer" and avg_hi >= 70:
-        return "Lived experience: summer core — dry and warm."
+        return "**Summer** — 75°F, no humidity, the ten months of grey earn their keep."
+    if dominant == "Second Summer":
+        return "**Second Summer** — arguably the best weather of the year."
+    if dominant == "Actual Fall":
+        return "**Actual Fall** — crisp, leaves, **The Grey** loading."
     return ""
 
 
@@ -554,12 +1017,14 @@ def render_series_progression(classifications: list[sqlite3.Row]) -> str:
     if not sequenced:
         return ""
 
-    lines = ["## Series progression", ""]
+    series_emoji = {"winter": "❄️", "spring": "🌷", "summer": "☀️", "fall": "🍂"}
+    lines = [section_heading("Series progression"), ""]
     for series_key in ("winter", "spring", "summer", "fall"):
         entries = sequenced.get(series_key, [])
         if not entries:
             continue
-        lines.append(f"### {series_key.title()} series")
+        e = series_emoji.get(series_key, "")
+        lines.append(f"### {e} {series_key.title()} series")
         lines.append("")
         per_concept: dict[str, list[str]] = defaultdict(list)
         order: list[str] = []
@@ -573,24 +1038,26 @@ def render_series_progression(classifications: list[sqlite3.Row]) -> str:
                 steps.append((first, last, name, n))
         steps.sort(key=lambda s: s[0])
         for first, last, name, n in steps:
-            lines.append(f"- **{humanize_span(first, last)}** ({n}d) — {name}")
+            lines.append(
+                f"- **{humanize_span(first, last)}** ({n}d) — {tag(name)}"
+            )
         lines.append("")
-    return "\n".join(lines)
+    return emojify("\n".join(lines))
 
 
 def render_triggered_events(classifications: list[sqlite3.Row]) -> str:
     triggered = [c for c in classifications if c["tier"] == "triggered"]
     if not triggered:
-        return "## Triggered events\n\n_None in this period._\n"
+        return f"{section_heading('Triggered events')}\n\n_None in this period._\n"
     lines = [
-        "## Triggered events",
+        section_heading("Triggered events"),
         "",
         "| Date | Event | Reason |",
         "| --- | --- | --- |",
     ]
     for c in triggered:
         reason = (c["reason"] or "").replace("|", "\\|")
-        lines.append(f"| {c['d']} | {c['display_name']} | {reason} |")
+        lines.append(f"| {c['d']} | {tag(c['display_name'])} | {reason} |")
     return "\n".join(lines) + "\n"
 
 
@@ -599,7 +1066,7 @@ def render_notable_days(observations: list[sqlite3.Row]) -> str:
         return ""
     with_temps = [o for o in observations if o["temp_high_f"] is not None]
     with_precip = [o for o in observations if o["precip_in"] and o["precip_in"] > 0]
-    lines = ["## Notable days", ""]
+    lines = [section_heading("Notable days"), ""]
 
     def block(title: str, rows: list[sqlite3.Row], fmt) -> None:
         if not rows:
@@ -610,20 +1077,20 @@ def render_notable_days(observations: list[sqlite3.Row]) -> str:
             lines.append(f"- {o['observed_date']}: {fmt(o)}")
         lines.append("")
 
-    block("Hottest highs", sorted(with_temps, key=lambda o: o["temp_high_f"], reverse=True),
+    block("🔥 Hottest highs", sorted(with_temps, key=lambda o: o["temp_high_f"], reverse=True),
           lambda o: f"**{o['temp_high_f']:.0f}°F** high (low {o['temp_low_f']:.0f}°F)")
-    block("Coldest lows", sorted(with_temps, key=lambda o: o["temp_low_f"]),
+    block("🧊 Coldest lows", sorted(with_temps, key=lambda o: o["temp_low_f"]),
           lambda o: f"**{o['temp_low_f']:.0f}°F** low (high {o['temp_high_f']:.0f}°F)")
-    block("Wettest days", sorted(with_precip, key=lambda o: o["precip_in"], reverse=True),
+    block("🌧️ Wettest days", sorted(with_precip, key=lambda o: o["precip_in"], reverse=True),
           lambda o: f"**{o['precip_in']:.2f}\"** precip"
-          + (f", {o['cloud_cover_mean_pct']:.0f}% cloud"
+          + (f", ☁️ {o['cloud_cover_mean_pct']:.0f}% cloud"
              if o["cloud_cover_mean_pct"] is not None else ""))
     return "\n".join(lines)
 
 
 def render_method_notes(total_days: int) -> str:
     return (
-        "## Method\n\n"
+        f"{section_heading('Method')}\n\n"
         "- Report reads cached observations from `db/microseasons.db` (0 API calls).\n"
         f"- Backfilling {total_days} days costs **2 Open-Meteo calls per city** "
         "(weather + air-quality). Re-fetch recent weeks before publishing — "
@@ -671,19 +1138,20 @@ def main() -> int:
         )
 
     stats = compute_stats(observations, normals, classifications)
+    month_ctx = build_month_contexts(observations, classifications)
 
     sections = [
         render_header(city, start, end, total_days),
-        render_ytd_summary(stats, classifications, observations),
+        render_ytd_summary(stats, classifications, observations, month_ctx),
         render_the_numbers(stats),
-        render_monthly_story(stats),
+        render_monthly_story(stats, month_ctx),
         render_season_timeline(observations, classifications),
         render_series_progression(classifications),
         render_triggered_events(classifications),
         render_notable_days(observations),
         render_method_notes(total_days),
     ]
-    body = "\n".join(s for s in sections if s).rstrip() + "\n"
+    body = emojify("\n".join(s for s in sections if s).rstrip() + "\n")
     out_path.write_text(body)
     print(f"Wrote {out_path} ({len(body):,} bytes, {body.count(chr(10))} lines).")
     return 0
