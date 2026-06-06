@@ -82,6 +82,11 @@
         "temp_low_f": { "type": ["number", "null"] },
         "precip_in": { "type": ["number", "null"] },
         "snow_in": { "type": ["number", "null"] },
+        "normal_high_f": { "type": ["number", "null"], "description": "Monthly normal high. Populated on the fetch+classify path; null on /v1/state." },
+        "normal_low_f": { "type": ["number", "null"] },
+        "normal_precip_in": { "type": ["number", "null"] },
+        "high_anomaly_f": { "type": ["number", "null"], "description": "Observed high minus normal high." },
+        "low_anomaly_f": { "type": ["number", "null"] },
         "headline": {
           "description": "Single dominant microseason for a tiny display: highest-confidence primary, else first triggered, else first secondary, else null. Present on `current`; omitted on forecast days.",
           "oneOf": [

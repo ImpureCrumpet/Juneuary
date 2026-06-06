@@ -10,7 +10,12 @@ import sqlite3
 from datetime import date
 from pathlib import Path
 
-from juneuary.predict import attach_forecast, forecast_day_states
+from juneuary.predict import (
+    attach_forecast,
+    build_days_payload,
+    classify_range,
+    forecast_day_states,
+)
 from juneuary.state import DayState, Location, MicroseasonState
 from juneuary import SCHEMA_VERSION
 
@@ -98,3 +103,30 @@ def test_attach_forecast_noop_without_latlng():
     attach_forecast(conn, state, days=2,
                     weather_fetcher=_fake_forecast, aq_fetcher=None)
     assert state.forecast == []
+
+
+def test_classify_range_marks_past_days_not_forecast_and_sets_anomaly():
+    conn = _catalog_db()
+    days = classify_range(
+        conn, "seattle", 47.6, -122.3,
+        date(2026, 2, 10), date(2026, 2, 11),
+        is_forecast=None,                       # decide per day; both are past
+        weather_fetcher=_fake_forecast, aq_fetcher=None,
+    )
+    assert [d.is_forecast for d in days] == [False, False]
+    # anomaly populated against the Feb normal high of 48F
+    assert days[0].normal_high_f == 48
+    assert days[0].high_anomaly_f == 40 - 48
+
+
+def test_build_days_payload_for_city():
+    conn = _catalog_db()
+    payload = build_days_payload(
+        conn, start=date(2026, 2, 10), end=date(2026, 2, 11),
+        city="seattle",
+        weather_fetcher=_fake_forecast, aq_fetcher=None,
+    )
+    assert payload["schema_version"] == SCHEMA_VERSION
+    assert payload["location"]["slug"] == "seattle"
+    assert len(payload["days"]) == 2
+    assert payload["days"][0]["high_anomaly_f"] == 40 - 48

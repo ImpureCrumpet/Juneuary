@@ -24,9 +24,11 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
+from datetime import date
+
 from . import SCHEMA_VERSION
 from .presentation import color_map, emoji_map, glyph_map
-from .state import build_state
+from .state import build_normals, build_state
 
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_DB = ROOT / "db" / "microseasons.db"
@@ -43,7 +45,7 @@ def _presentation_payload() -> dict:
     }
 
 
-def make_handler(db_path: str):
+def make_handler(db_path: str, weather_fetcher=None, aq_fetcher=None):
     class Handler(BaseHTTPRequestHandler):
         server_version = "juneuary/" + SCHEMA_VERSION
 
@@ -85,6 +87,10 @@ def make_handler(db_path: str):
                 self._state(params)
             elif route == "/v1/forecast":
                 self._state(params, with_forecast=True)
+            elif route == "/v1/days":
+                self._days(params)
+            elif route == "/v1/normals":
+                self._normals(params)
             else:
                 self._send(HTTPStatus.NOT_FOUND, {"error": f"no route {route}"})
 
@@ -123,6 +129,45 @@ def make_handler(db_path: str):
                 return
             self._send(HTTPStatus.OK, state.to_dict())
 
+        def _days(self, params: dict) -> None:
+            city = params.get("city")
+            lat, lng = params.get("lat"), params.get("lng")
+            start, end = params.get("start"), params.get("end")
+            if not start or not end:
+                self._send(HTTPStatus.BAD_REQUEST,
+                           {"error": "missing ?start= and ?end= (YYYY-MM-DD)"})
+                return
+            if not city and not (lat and lng):
+                self._send(HTTPStatus.BAD_REQUEST,
+                           {"error": "provide ?city= or ?lat=&lng="})
+                return
+            from .predict import build_days_payload
+            conn = self._connect()
+            try:
+                payload = build_days_payload(
+                    conn,
+                    start=date.fromisoformat(start), end=date.fromisoformat(end),
+                    city=city,
+                    lat=float(lat) if lat else None,
+                    lng=float(lng) if lng else None,
+                    weather_fetcher=weather_fetcher, aq_fetcher=aq_fetcher,
+                )
+            finally:
+                conn.close()
+            self._send(HTTPStatus.OK, payload)
+
+        def _normals(self, params: dict) -> None:
+            city = params.get("city")
+            if not city:
+                self._send(HTTPStatus.BAD_REQUEST, {"error": "missing ?city="})
+                return
+            conn = self._connect()
+            try:
+                payload = build_normals(conn, city)
+            finally:
+                conn.close()
+            self._send(HTTPStatus.OK, payload)
+
         def log_message(self, fmt: str, *args) -> None:
             # Quieter than the default stderr spam; still shows method + path.
             print(f"  {self.address_string()} {fmt % args}")
@@ -130,10 +175,13 @@ def make_handler(db_path: str):
     return Handler
 
 
-def serve(db_path: str = str(DEFAULT_DB), host: str = "127.0.0.1", port: int = 8787) -> None:
-    httpd = ThreadingHTTPServer((host, port), make_handler(db_path))
+def serve(db_path: str = str(DEFAULT_DB), host: str = "127.0.0.1", port: int = 8787,
+          weather_fetcher=None, aq_fetcher=None) -> None:
+    handler = make_handler(db_path, weather_fetcher=weather_fetcher, aq_fetcher=aq_fetcher)
+    httpd = ThreadingHTTPServer((host, port), handler)
     print(f"juneuary serve v{SCHEMA_VERSION} on http://{host}:{port}  (db: {db_path})")
-    print("  GET /v1/health  /v1/presentation  /v1/state?city=  /v1/forecast?city=")
+    print("  GET /v1/health  /v1/presentation  /v1/state  /v1/forecast  "
+          "/v1/days?city=&start=&end=  /v1/normals?city=")
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:

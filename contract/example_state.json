@@ -5,7 +5,8 @@
     "name": "Seattle",
     "latitude": 47.6062,
     "longitude": -122.3321,
-    "source": "catalog"
+    "source": "catalog",
+    "catalog_slug": null
   },
   "as_of": "2026-02-14",
   "current": {
@@ -56,6 +57,11 @@
     "temp_low_f": 44.0,
     "precip_in": 0.0,
     "snow_in": 0.0,
+    "normal_high_f": null,
+    "normal_low_f": null,
+    "normal_precip_in": null,
+    "high_anomaly_f": null,
+    "low_anomaly_f": null,
     "headline": {
       "canonical_name": "Fool's Spring",
       "display_name": "Fool's Spring",

@@ -63,16 +63,22 @@ def _day_state_from_classify(
     observed_date: str,
     day: dict,
     result: "classify.ClassifyResult",
+    is_forecast: bool,
 ) -> DayState:
     ds = DayState(
         date=observed_date,
-        is_forecast=True,
+        is_forecast=is_forecast,
         temp_high_f=day.get("temp_high_f"),
         temp_low_f=day.get("temp_low_f"),
         precip_in=day.get("precip_in"),
         snow_in=day.get("snow_in"),
         is_aberration=result.is_aberration,
         aberration_reason=result.aberration_reason,
+        normal_high_f=result.anomaly.normal_high_f,
+        normal_low_f=result.anomaly.normal_low_f,
+        normal_precip_in=result.anomaly.normal_precip_in,
+        high_anomaly_f=result.anomaly.high_anomaly_f,
+        low_anomaly_f=result.anomaly.low_anomaly_f,
     )
     for tier, matches in (("primary", result.primary),
                           ("secondary", result.secondary),
@@ -93,24 +99,32 @@ def _day_state_from_classify(
     return ds
 
 
-def forecast_day_states(
+def classify_range(
     conn: sqlite3.Connection,
     city_slug: str,
     lat: float,
     lng: float,
     start: date,
     end: date,
+    is_forecast: bool | None = None,
     weather_fetcher: WeatherFetcher = _default_weather_fetcher,
     aq_fetcher: AQFetcher | None = _default_aq_fetcher,
 ) -> list[DayState]:
-    """Classify each forecast day in [start, end] and return DayStates.
+    """Fetch + classify every day in [start, end] and return DayStates.
+
+    Works for past ranges (the default fetcher routes to the ERA5 archive) and
+    future ranges (forecast) alike, so it backs both /v1/days (history) and the
+    forecast path. `is_forecast`:
+      - True/False : stamp every day accordingly.
+      - None       : decide per day (date > today => forecast).
 
     The prior-overcast streak (needed for first-sun events) is seeded from the
-    DB history before `start`, then walked forward across the forecast window.
+    DB history before `start`, then walked forward across the window.
     """
     days = sorted(weather_fetcher(lat, lng, start, end), key=lambda d: d["date"])
     if not days:
         return []
+    today = date.today()
 
     aq_by_day: dict = {}
     if aq_fetcher is not None:
@@ -153,7 +167,8 @@ def forecast_day_states(
             prior_overcast_days=streak,
         )
         result = classify.classify_observation(conn, inp)
-        out.append(_day_state_from_classify(day["date"], day, result))
+        fc = is_forecast if is_forecast is not None else (d > today)
+        out.append(_day_state_from_classify(day["date"], day, result, fc))
 
         # Walk the streak forward for the next iteration.
         if cloud is not None and cloud >= classify.OVERCAST_CLOUD_PCT:
@@ -161,6 +176,83 @@ def forecast_day_states(
         else:
             streak = 0
     return out
+
+
+def forecast_day_states(
+    conn: sqlite3.Connection,
+    city_slug: str,
+    lat: float,
+    lng: float,
+    start: date,
+    end: date,
+    weather_fetcher: WeatherFetcher = _default_weather_fetcher,
+    aq_fetcher: AQFetcher | None = _default_aq_fetcher,
+) -> list[DayState]:
+    """Classify [start, end] as forecast days (every day stamped is_forecast)."""
+    return classify_range(
+        conn, city_slug, lat, lng, start, end,
+        is_forecast=True,
+        weather_fetcher=weather_fetcher, aq_fetcher=aq_fetcher,
+    )
+
+
+def build_days_payload(
+    conn: sqlite3.Connection,
+    start: date,
+    end: date,
+    city: str | None = None,
+    lat: float | None = None,
+    lng: float | None = None,
+    weather_fetcher: WeatherFetcher | None = None,
+    aq_fetcher: AQFetcher | None = None,
+) -> dict | None:
+    """/v1/days payload: fetch Open-Meteo for [start, end], classify each day,
+    return the list of DayStates plus the resolved location.
+
+    Pass either `city` (catalog/child slug) or `lat`+`lng` (borrows nearest
+    catalog). Fetchers default to the live Open-Meteo wrappers; inject fakes in
+    tests.
+    """
+    conn.row_factory = sqlite3.Row
+    wf = weather_fetcher or _default_weather_fetcher
+    af = aq_fetcher if aq_fetcher is not None else _default_aq_fetcher
+
+    if city:
+        row = conn.execute(
+            "SELECT slug, name, latitude, longitude FROM cities WHERE slug = ?",
+            [city],
+        ).fetchone()
+        if row is None:
+            raise ValueError(f"unknown city: {city}")
+        slug, name = row["slug"], row["name"]
+        use_lat, use_lng = row["latitude"], row["longitude"]
+        location = Location(slug, name, use_lat, use_lng, source="catalog")
+    elif lat is not None and lng is not None:
+        nearest = nearest_catalog_city(conn, lat, lng)
+        if nearest is None:
+            raise ValueError("no catalog cities available to borrow a catalog from")
+        slug = nearest.slug
+        use_lat, use_lng = lat, lng
+        location = Location(slug, f"{lat:.3f}, {lng:.3f}", lat, lng,
+                            source="latlng", catalog_slug=nearest.slug)
+    else:
+        raise ValueError("provide city or lat+lng")
+
+    if use_lat is None or use_lng is None:
+        raise ValueError(f"{slug} has no coordinates")
+
+    days = classify_range(
+        conn, slug, use_lat, use_lng, start, end,
+        is_forecast=None, weather_fetcher=wf, aq_fetcher=af,
+    )
+    from dataclasses import asdict
+    return {
+        "schema_version": SCHEMA_VERSION,
+        "location": asdict(location),
+        "start": start.isoformat(),
+        "end": end.isoformat(),
+        "days": [asdict(d) for d in days],
+    }
 
 
 def attach_forecast(
