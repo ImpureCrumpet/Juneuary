@@ -7,12 +7,19 @@ Seeded with Seattle and San Francisco; the data model is built to expand to
 peer cities without duplicating shared concepts (Spider Season, Smogust,
 Hell's Front Porch are one row each globally).
 
+Juneuary is the **engine**: the catalog/DB, the classification + forecast
+logic, and a small JSON **API** that is the single front door for classified
+data. Presentation layers (the markdown YTD report, a future display app) are
+pure API consumers and live elsewhere — the report generator lives on the
+**`report-builder`** branch.
+
 ## Stack
 
 - **Data layer**: SQLite, generated from YAML source-of-truth files.
-- **Build**: Python 3.12 via `uv`.
+- **Engine + API**: Python 3.12 via `uv`; `src/juneuary/` package + a
+  zero-dependency stdlib HTTP API. The render-model contract is in `contract/`.
 - **Agent skills**: [skills-harness](https://github.com/Gargoyle-Apps/skills-harness) vendored at `.skills-harness/` (git subtree); project skills under `.skills/_skills/j-*`.
-- **Frontend (planned)**: Node 24 + pnpm (framework TBD).
+- **Frontend (planned)**: Node 24 + pnpm (framework TBD), over the API.
 
 ## Project layout
 
@@ -22,25 +29,38 @@ data/
   series.yaml                 named series (winter, spring, fall, ...)
   microseasons.yaml           GLOBAL CONCEPTS (city-independent)
   precipitation.yaml          rain intensity scale + named patterns
+  presentation.yaml           display metadata (emoji/color/glyph) per concept
   cities/
-    seattle.yaml              per-city: occurrences + overlaps + patterns + normals + narrative
+    seattle.yaml              per-city: occurrences + overlaps + patterns + normals
     san_francisco.yaml        per-city: occurrences + overlaps + patterns + normals
     # Neighborhood / grid-cell children live in the gitignored
     # data/cities.local.yaml (see data/cities.local.example.yaml) and
-    # inherit catalog + normals + narrative via parent_slug.
+    # inherit catalog + normals via parent_slug.
 db/
   schema.sql                  SQLite schema (the DDL is the spec)
   microseasons.db             generated; gitignored
+src/juneuary/                 engine package (importable, runtime-agnostic)
+  presentation.py             emoji/color/glyph lookups from presentation.yaml
+  state.py                    MicroseasonState DTO + DB builders
+  predict.py                  fetch+classify a date range (archive/forecast)
+  locate.py                   nearest-catalog resolution for arbitrary lat/lng
+  serve.py                    stdlib HTTP API (/v1/*)
 scripts/
   build_db.py                 YAML -> SQLite (idempotent)
   query.py                    inspection CLI (propose, active, last-seen, ...)
   fetch_weather.py            Open-Meteo client: fetch + classify + persist
   classify.py                 shared classifier (primary/secondary/triggered)
   solar.py                    solar geometry (declination + max elevation)
-  report.py                   combined YTD markdown report from DB
+  serve.py                    launch the JSON API
+  state.py                    dump a MicroseasonState as JSON (CLI)
+contract/                     versioned render-model contract (JSON Schema + example)
 .skills/                      agent skills (harness + j-* project skills)
 .skills-harness/              vendored skills-harness kit (git subtree)
 ```
+
+> The markdown YTD report (`scripts/report.py`, the per-city `narrative:`
+> templates, and `reports/`) lives on the **`report-builder`** branch, where it
+> consumes this API instead of the DB.
 
 ## Agent skills
 
@@ -49,12 +69,35 @@ Vendored from [Gargoyle-Apps/skills-harness](https://github.com/Gargoyle-Apps/sk
 | Skill | Purpose |
 |-------|---------|
 | `j-weather-sync` | Fetch Open-Meteo → SQLite, re-classify |
-| `j-ytd-report` | YTD report with vernacular narrative + emoji (summary, timeline, tables) |
-| `j-report-review` | Verify reports against live Open-Meteo |
 
 Update the kit: `git subtree pull --prefix=.skills-harness skills-harness main --squash` (see **harness-subtree** skill).
 
-Reports are written to `reports/` (gitignored except `.gitkeep`). Use `seattle` for city-center coords; add neighborhood-level grid cells to a gitignored `data/cities.local.yaml` (see `data/cities.local.example.yaml`).
+Report-specific skills (`j-ytd-report`, `j-report-review`) live on the **`report-builder`** branch alongside the report generator.
+
+Use `seattle` for city-center coords; add neighborhood-level grid cells to a gitignored `data/cities.local.yaml` (see `data/cities.local.example.yaml`).
+
+## HTTP API
+
+A zero-dependency stdlib server exposes the classification engine. It is the
+single front door — consumers never touch the DB or Open-Meteo directly.
+
+```bash
+uv run scripts/serve.py            # http://127.0.0.1:8787
+```
+
+| Route | Returns |
+|-------|---------|
+| `GET /v1/health` | liveness + schema version |
+| `GET /v1/presentation` | emoji/color/glyph maps |
+| `GET /v1/state?city=&date=` | a day's `MicroseasonState` from stored observations |
+| `GET /v1/forecast?city=&days=` | current state + a forecast window |
+| `GET /v1/days?city=\|lat=&lng=&start=&end=` | a classified range — fetches Open-Meteo (archive/forecast) and classifies internally |
+| `GET /v1/normals?city=` | monthly climate normals |
+
+The response shape is versioned (`SCHEMA_VERSION`) and documented in
+`contract/state.schema.json` with a worked example in
+`contract/example_state.json`. Arbitrary `lat`/`lng` borrow the nearest
+catalog city; child cities expose their parent via `catalog_slug`.
 
 ## Quick start
 
@@ -351,7 +394,8 @@ spring fakeouts because there's no proper winter to be relieved from.
 
 1. Add a row to `data/cities.yaml`.
 2. Create `data/cities/<slug>.yaml` with `occurrences:`, `overlaps:`,
-   `precipitation_patterns:`, and ideally `climate_normals:` + `narrative:`.
+   `precipitation_patterns:`, and ideally `climate_normals:`. (Report narrative
+   templates, if any, live on the `report-builder` branch.)
 3. If you need a brand-new concept that doesn't already exist (a city-unique
    microseason), add it to `data/microseasons.yaml` as a concept first, then
    give it an occurrence in your new city file.
@@ -373,8 +417,9 @@ down to one block:
 ```
 
 `scripts/build_db.py` merges `cities.local.yaml` on top of `cities.yaml`
-automatically. No per-city YAML required. Occurrences, climate normals,
-and narrative templates resolve through `v_catalog_city` at query time.
+automatically. No per-city YAML required. Occurrences and climate normals
+resolve through `v_catalog_city` at query time (and the API surfaces the
+parent via `catalog_slug` so consumers can inherit parent-owned resources).
 Observations are still scoped to the child (independent grid cell), so
 anomaly + last-seen data is local even when the catalog isn't. Optional
 per-grid normals override: drop a `data/cities/<slug>.local.yaml` with
@@ -421,7 +466,7 @@ overlap pairs whose concepts have no occurrence in that city.
 - Add a non-West-Coast city (NYC / Boston / Chicago) to stress-test the
   model with hurricanes, polar vortex, real winter, and humid summers.
 - Move first-sun thresholds + signal-gate parameters out of `classify.py`
-  and into per-city YAML (mirror the `narrative:` pattern Seattle now uses).
+  and into per-city YAML (mirror the data-driven `presentation.yaml` pattern).
 - Per-grid climate-normal overrides for sibling cities — children
   currently inherit the parent's official-airport normals, which can be
   several degrees off in micro-climates.
